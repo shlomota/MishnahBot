@@ -7,7 +7,6 @@ This project demonstrates the creation of a Retrieval-Augmented Generation (RAG)
 - [Introduction](#introduction)
 - [Setup](#setup)
 - [Dataset](#dataset)
-- [Vectorization and Storage](#vectorization-and-storage)
 - [Running the RAG Application](#running-the-rag-application)
 - [Multilingual RAG Approach](#multilingual-rag-approach)
 - [Conclusion](#conclusion)
@@ -57,6 +56,13 @@ sudo apt install tree
 tree Mishnah/ | less
 ```
 
+## Running the RAG Application
+To run the application you can follow the notebook MishnahBot.ipynb
+Alternatively, you can run the streamlit app in the src/ directory.
+```
+streamlit run app.py
+```
+
 ## Multilingual RAG Approach
 This application supports both Hebrew and English interactions. It uses the following approach:
 
@@ -78,6 +84,6 @@ This project highlights the potential of RAG applications in making ancient text
 ## Contributing
 Contributions are welcome! Please feel free to submit a Pull Request.
 
-License
+## License
 This project is licensed under the MIT License.
 
