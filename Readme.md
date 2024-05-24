@@ -40,8 +40,7 @@ This project aims to make ancient Jewish texts more accessible by enabling seman
 The dataset for this project is the Mishnah, obtained from the Sefaria-Export repository. The dataset includes both English translations and the original Hebrew text.
 
 ### Downloading the Dataset
-
-Run the following commands to download the dataset:
+If you want to build the vector db from scratch, run the following commands to download the dataset:
 ```bash
 git init sefaria-json
 cd sefaria-json
@@ -57,9 +56,10 @@ tree Mishnah/ | less
 ```
 
 ## Running the RAG Application
-To run the application you can follow the notebook MishnahBot.ipynb
-Alternatively, you can run the streamlit app in the src/ directory.
+To continue building the application you can follow the notebook MishnahBot.ipynb
+Alternatively, you can run the streamlit app in the directory.
 ```
+cd src/
 streamlit run app.py
 ```
 
