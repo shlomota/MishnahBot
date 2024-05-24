@@ -56,7 +56,7 @@ tree Mishnah/ | less
 ```
 
 ## Running the RAG Application
-To continue building the application you can follow the notebook MishnahBot.ipynb
+To continue building the application you can follow the [notebook](https://github.com/shlomota/MishnahBot/blob/main/Mishnah%20RAG.ipynb).
 Alternatively, you can run the streamlit app in the directory.
 ```
 cd src/
