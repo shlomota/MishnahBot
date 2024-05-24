@@ -1,4 +1,4 @@
-# Multilingual RAG Demo
+# MishnahBot: A Cross-Lingual RAG Application
 
 This project demonstrates the creation of a Retrieval-Augmented Generation (RAG) application that interacts with the Mishnah, an ancient Rabbinic text, using AWS SageMaker, AWS Bedrock, LangChain, and ChromaDB. The application supports both English and Hebrew interactions.
 
