@@ -24,16 +24,12 @@ This project aims to make ancient Jewish texts more accessible by enabling seman
     git clone https://github.com/shlomota/MishnahBot.git
     cd MishnahBot
     ```
-
-2. Set up your AWS credentials:
-    ```bash
-    aws configure
-    ```
-
-3. Install the necessary Python packages:
+    
+2. Install the necessary Python packages:
     ```bash
     pip install -r requirements.txt
     ```
+3. You will need to set up access to AWS Bedrock for calling 3rd party LLMs. Alternatively, you can alter the code and use the key for your preferred LLM.
 
 ## Dataset
 
@@ -57,7 +53,7 @@ tree Mishnah/ | less
 
 ## Running the RAG Application
 To continue building the application you can follow the [notebook](https://github.com/shlomota/MishnahBot/blob/main/Mishnah%20RAG.ipynb).
-Alternatively, you can run the streamlit app in the directory.
+Alternatively, you can run the streamlit app directly.
 ```
 cd src/
 streamlit run app.py
