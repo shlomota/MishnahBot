@@ -22,8 +22,8 @@ This project aims to make ancient Jewish texts more accessible by enabling seman
 
 1. Clone the repository:
     ```bash
-    git clone https://github.com/shlomota/Multilingual-RAG-Demo.git
-    cd Multilingual-RAG-Demo
+    git clone https://github.com/shlomota/MishnahBot.git
+    cd MishnahBot
     ```
 
 2. Set up your AWS credentials:
@@ -54,4 +54,30 @@ git pull origin master
 mkdir -p new_directory
 find Mishnah/Seder* -name "merged.json" -exec cp --parents \{\} new_directory/ \;
 sudo apt install tree
-tree Mishna/ | less
+tree Mishnah/ | less
+```
+
+## Multilingual RAG Approach
+This application supports both Hebrew and English interactions. It uses the following approach:
+
+### Hebrew Mode:
+* Input query in Hebrew.
+* Translate the query to English.
+* Embed the query and retrieve relevant documents.
+* Use the original Hebrew texts as context.
+* Generate the response in Hebrew.
+
+### English Mode:
+Input query in English.
+Embed the query and retrieve relevant documents.
+Generate the response in English.
+
+## Conclusion
+This project highlights the potential of RAG applications in making ancient texts accessible and interactive. By combining modern AI technologies with traditional texts, we can create powerful tools for education and research.
+
+## Contributing
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+License
+This project is licensed under the MIT License.
+
