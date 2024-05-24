@@ -1,4 +1,6 @@
 # MishnahBot: A Cross-Lingual RAG Application
+![DALL·E 2024-05-22 12 30 55 - A robot studying Mishnah in a yeshiva  The robot, designed with a sleek and modern look, is seated at a traditional wooden desk, surrounded by stacks ](https://github.com/shlomota/MishnahBot/assets/73965390/f627cb44-3836-480c-83fa-ec8beb633a86)
+
 
 This project demonstrates the creation of a Retrieval-Augmented Generation (RAG) application that interacts with the Mishnah, an ancient Rabbinic text, using AWS SageMaker, AWS Bedrock, LangChain, and ChromaDB. The application supports both English and Hebrew interactions.
 
