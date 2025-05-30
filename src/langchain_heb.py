@@ -5,15 +5,6 @@ from langchain_community.chat_models import BedrockChat
 from langchain.prompts import PromptTemplate
 from chroma import simple_retriever, remove_vowels_hebrew
 
-# Initialize AWS Bedrock for Llama 3 70B Instruct with specific configurations for translation
-translation_llm = Bedrock(
-    model_id="meta.llama3-70b-instruct-v1:0",
-    model_kwargs={
-        "temperature": 0.0,  # Set lower temperature for translation
-        "max_gen_len": 50  # Limit number of tokens for translation
-    }
-)
-
 translation_llm = BedrockChat(
     model_id="anthropic.claude-3-sonnet-20240229-v1:0",
     model_kwargs={

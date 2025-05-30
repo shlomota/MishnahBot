@@ -6,16 +6,23 @@ from langchain_eng import SimpleQAChain as EngQAChain, english_llm_chain
 from chroma import simple_retriever
 import os
 
+import streamlit as st
+import streamlit.components.v1 as components
 
-# JavaScript for redirecting based on URL
-redirect_script = """
-<script type="text/javascript">
-    const currentUrl = window.location.href;
-    if (currentUrl.includes("taami.us")) {
-        window.location.replace("http://taami.us:8501");
-    }
-</script>
-"""
+st.set_page_config(page_title="MishnahBot: A Cross-Lingual RAG Application")
+
+def load_custom_index_html(file_path):
+    with open(file_path, 'r') as file:
+        return file.read()
+
+# Path to your custom index.html
+custom_index_html_path = "index.html"
+
+# Load the custom index.html content
+custom_index_html = load_custom_index_html(custom_index_html_path)
+
+# Inject the custom index.html content into the Streamlit app
+#components.html(custom_index_html, height=600)
 
 GA_TRACKING_CODE = """
 <!-- Global site tag (gtag.js) - Google Analytics -->
@@ -45,9 +52,7 @@ def write_request_count(count, date):
 
 
 # Streamlit app
-st.set_page_config(page_title="MishnahBot: A Cross-Lingual RAG Application")
 # Insert the redirect script
-st.markdown(redirect_script, unsafe_allow_html=True)
 st.markdown(GA_TRACKING_CODE, unsafe_allow_html=True)
 
 # Page title
@@ -162,8 +167,10 @@ st.markdown(
     """
     <div style='text-align: center; padding-top: 20px;'>
         Made by <a href="https://www.linkedin.com/in/shlomo-tannor-aa967a1a8/" target="_blank">Shlomo Tannor</a> |
-        <a href="https://medium.com/@stannor/exploring-rag-applications-across-languages-conversing-with-the-mishnah-16615c30f780" target="_blank">Read more on Medium</a>
+        <a href="https://medium.com/@stannor/exploring-rag-applications-across-languages-conversing-with-the-mishnah-16615c30f780" target="_blank">Read more on Medium</a> |
+        <a href="https://github.com/shlomota/MishnahBot" target="_blank">GitHub</a>
     </div>
     """,
     unsafe_allow_html=True
 )
+
