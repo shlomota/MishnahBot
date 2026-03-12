@@ -6,7 +6,7 @@ from langchain.prompts import PromptTemplate
 from chroma import simple_retriever, remove_vowels_hebrew
 
 translation_llm = BedrockChat(
-    model_id="anthropic.claude-3-sonnet-20240229-v1:0",
+    model_id="anthropic.claude-sonnet-4-5-20250929-v1:0",
     model_kwargs={
         "temperature": 0.0,  # Set lower temperature for translation
         "max_tokens": 100
@@ -17,7 +17,7 @@ translation_llm = BedrockChat(
 
 # Initialize AWS Bedrock for Claude Sonnet with specific configurations for generation
 generation_llm = BedrockChat(
-    model_id="anthropic.claude-3-sonnet-20240229-v1:0",
+    model_id="anthropic.claude-sonnet-4-5-20250929-v1:0",
     model_kwargs={"max_tokens": 300, "temperature": 0.3},
 )
 

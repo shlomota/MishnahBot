@@ -6,7 +6,7 @@ from chroma import simple_retriever
 
 # Initialize AWS Bedrock for Claude Sonnet with specific configurations for generation
 generation_llm = BedrockChat(
-    model_id="anthropic.claude-3-sonnet-20240229-v1:0"
+    model_id="anthropic.claude-sonnet-4-5-20250929-v1:0"
 )
 
 # Define the prompt template for English answers
