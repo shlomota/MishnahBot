@@ -145,20 +145,28 @@ if st.button("Submit") and query_input:
         else:
             qa_chain = EngQAChain(simple_retriever, english_llm_chain)
         
-        response, sources = qa_chain({"query": query_input})
-        
+        response, sources, related_sources = qa_chain({"query": query_input})
+
         # Update the request count
         requests_left -= 1
         write_request_count(requests_left, last_update_date)
         requests_counter.markdown(f"Requests left today: {requests_left}")
-        
+
         st.markdown(f"<h3 class='rtl'>תשובה:</h3>" if language == 'Hebrew' else "<h3>Answer:</h3>", unsafe_allow_html=True)
         st.markdown(f"<div class='rtl'>{response}</div>" if language == 'Hebrew' else f"<div class='ltr'>{response}</div>", unsafe_allow_html=True)
+
         st.markdown(f"<h3 class='rtl'>מקורות:</h3>" if language == 'Hebrew' else "<h3>Sources:</h3>", unsafe_allow_html=True)
         for source in sources:
             with st.expander(source['name']):
                 st.markdown(f"#### {source['name']}")
                 st.markdown(f"<div class='rtl'>{source['text']}</div>" if language == 'Hebrew' else f"<div class='ltr'>{source['text']}</div>", unsafe_allow_html=True)
+
+        if related_sources:
+            st.markdown(f"<h3 class='rtl'>מקורות קשורים:</h3>" if language == 'Hebrew' else "<h3>Related Sources:</h3>", unsafe_allow_html=True)
+            for source in related_sources:
+                with st.expander(source['name']):
+                    st.markdown(f"#### {source['name']}")
+                    st.markdown(f"<div class='rtl'>{source['text']}</div>" if language == 'Hebrew' else f"<div class='ltr'>{source['text']}</div>", unsafe_allow_html=True)
     else:
         st.warning("No requests left for today. Please try again tomorrow.")
 
