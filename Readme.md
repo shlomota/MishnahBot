@@ -4,6 +4,13 @@
 
 This project demonstrates the creation of a Retrieval-Augmented Generation (RAG) application that interacts with the Mishnah, an ancient Rabbinic text, using AWS Bedrock, LangChain, and ChromaDB. The application supports both English and Hebrew interactions.
 
+## Recent Updates
+
+- **LLM Reranking (2026):** Retrieves top 20 candidate passages from ChromaDB and uses the LLM in a single call to both answer the question and identify which sources were actually used. Cited sources are displayed separately from related-but-not-cited sources.
+- **Related Sources Section (2026):** After each answer, a collapsible "Related Sources" section shows topically relevant passages that weren't directly cited in the answer.
+- **Upgraded to Claude Sonnet 4.5 (2026):** Migrated from the legacy Claude 3 Sonnet model to `claude-sonnet-4-5` via AWS Bedrock cross-region inference profiles.
+- **Migrated to `langchain-aws` + LCEL (2026):** Replaced deprecated `langchain_community.BedrockChat` and `LLMChain` with `langchain_aws.ChatBedrock` and LangChain Expression Language (LCEL), removing dependency on `langchain` and `langchain-classic`.
+
 ## Table of Contents
 
 - [Introduction](#introduction)
@@ -26,12 +33,13 @@ This project aims to make ancient Jewish texts more accessible by enabling seman
     git clone https://github.com/shlomota/MishnahBot.git
     cd MishnahBot
     ```
-    
+
 2. Install the necessary Python packages:
     ```bash
-    pip install -r requirements.txt
+    pip install -r src/requirements.txt
     ```
-3. You will need to set up access to AWS Bedrock for calling 3rd party LLMs. Alternatively, you can alter the code and use the key for your preferred LLM.
+
+3. You will need to set up access to AWS Bedrock and enable the Claude Sonnet 4.5 model (`us.anthropic.claude-sonnet-4-5-20250929-v1:0`) via a cross-region inference profile. Alternatively, you can alter the code and use your preferred LLM.
 
 ## Dataset
 
@@ -67,14 +75,15 @@ This application supports both Hebrew and English interactions. It uses the foll
 ### Hebrew Mode:
 * Input query in Hebrew.
 * Translate the query to English.
-* Embed the query and retrieve relevant documents.
-* Use the original Hebrew texts as context.
-* Generate the response in Hebrew.
+* Embed the query and retrieve the top 20 relevant passages.
+* LLM answers in Hebrew and identifies which passages it used.
+* Cited sources and related sources are displayed separately.
 
 ### English Mode:
-Input query in English.
-Embed the query and retrieve relevant documents.
-Generate the response in English.
+* Input query in English.
+* Embed the query and retrieve the top 20 relevant passages.
+* LLM answers in English and identifies which passages it used.
+* Cited sources and related sources are displayed separately.
 
 ## Conclusion
 This project highlights the potential of RAG applications in making ancient texts accessible and interactive. By combining modern AI technologies with traditional texts, we can create powerful tools for education and research.
@@ -84,4 +93,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 This project is licensed under the MIT License.
-

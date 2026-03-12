@@ -1,5 +1,6 @@
-langchain
-chromadb==0.5.0
+langchain-aws
+langchain-core
+chromadb
 sentence-transformers
-langchain-community
 python-bidi
+streamlit
