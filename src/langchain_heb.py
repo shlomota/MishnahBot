@@ -1,7 +1,7 @@
 import re
-from langchain.chains import LLMChain
+from langchain_classic.chains import LLMChain
 from langchain_aws import ChatBedrock
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from chroma import simple_retriever, remove_vowels_hebrew
 
 translation_llm = ChatBedrock(

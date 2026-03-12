@@ -1,7 +1,7 @@
 import re
-from langchain.chains import LLMChain, RetrievalQA
+from langchain_classic.chains import LLMChain, RetrievalQA
 from langchain_aws import ChatBedrock
-from langchain.prompts import PromptTemplate
+from langchain_core.prompts import PromptTemplate
 from chroma import simple_retriever
 
 # Initialize AWS Bedrock for Claude Sonnet with specific configurations for generation
