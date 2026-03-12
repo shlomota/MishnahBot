@@ -1,7 +1,7 @@
 import re
-from langchain_classic.chains import LLMChain
 from langchain_aws import ChatBedrock
 from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 from chroma import simple_retriever, remove_vowels_hebrew
 
 translation_llm = ChatBedrock(
@@ -12,8 +12,6 @@ translation_llm = ChatBedrock(
     }
 )
 
-
-
 # Initialize AWS Bedrock for Claude Sonnet with specific configurations for generation
 generation_llm = ChatBedrock(
     model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0",
@@ -23,7 +21,7 @@ generation_llm = ChatBedrock(
 # Define the translation prompt template
 translation_prompt_template = PromptTemplate(
     input_variables=["text"],
-    template="""Translate the following Hebrew text to English, take into account that it relates to the mishnah. 
+    template="""Translate the following Hebrew text to English, take into account that it relates to the mishnah.
 Provide only the resulting English query NO OTHER TEXT.
 Input text: {text}
 Translation: """
@@ -40,16 +38,10 @@ hebrew_prompt_template = PromptTemplate(
 )
 
 # Translation chain for translating queries from Hebrew to English
-translation_chain = LLMChain(
-    llm=translation_llm,
-    prompt=translation_prompt_template
-)
+translation_chain = translation_prompt_template | translation_llm | StrOutputParser()
 
 # Initialize the LLM chain for Hebrew answers
-hebrew_llm_chain = LLMChain(
-    llm=generation_llm,
-    prompt=hebrew_prompt_template
-)
+hebrew_llm_chain = hebrew_prompt_template | generation_llm | StrOutputParser()
 
 # Define SimpleQA chain with translation for Hebrew
 class SimpleQAChainWithTranslation:
@@ -60,15 +52,15 @@ class SimpleQAChainWithTranslation:
 
     def __call__(self, inputs):
         hebrew_query = inputs["query"]
-        
-        translated_query = self.translation_chain.run({"text": hebrew_query})
-        
+
+        translated_query = self.translation_chain.invoke({"text": hebrew_query})
+
         english_docs, hebrew_docs, sources = self.retriever(translated_query, k=3)
         hebrew_docs = [remove_vowels_hebrew(doc) for doc in hebrew_docs]
 
         context = "\n".join(hebrew_docs)
-        
-        response = self.llm_chain.run({"context": context, "question": hebrew_query})
+
+        response = self.llm_chain.invoke({"context": context, "question": hebrew_query})
         sources_with_bold = []
         for source in sources:
             source_text = re.sub(r'<b>(.*?)</b>', r'**\1**', source['hebrew'])  # Replace <b> with markdown bold
@@ -76,10 +68,9 @@ class SimpleQAChainWithTranslation:
                 "name": f"{source['seder']} {source['tractate']} Chapter {source['chapter']}, Mishnah {source['mishnah']}",
                 "text": source_text
             })
-        
+
         return response, sources_with_bold
 
 # Function to initialize the Hebrew QA Chain
 def HebQAChain():
     return SimpleQAChainWithTranslation(translation_chain, simple_retriever, hebrew_llm_chain)
-

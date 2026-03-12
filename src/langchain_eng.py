@@ -1,7 +1,7 @@
 import re
-from langchain_classic.chains import LLMChain, RetrievalQA
 from langchain_aws import ChatBedrock
 from langchain_core.prompts import PromptTemplate
+from langchain_core.output_parsers import StrOutputParser
 from chroma import simple_retriever
 
 # Initialize AWS Bedrock for Claude Sonnet with specific configurations for generation
@@ -21,10 +21,7 @@ english_prompt_template = PromptTemplate(
 )
 
 # Initialize the LLM chain for English answers
-english_llm_chain = LLMChain(
-    llm=generation_llm,
-    prompt=english_prompt_template
-)
+english_llm_chain = english_prompt_template | generation_llm | StrOutputParser()
 
 # Define SimpleQA chain for English
 class SimpleQAChain:
@@ -34,23 +31,21 @@ class SimpleQAChain:
 
     def __call__(self, inputs):
         question = inputs["query"]
-        
+
         english_docs, hebrew_docs, sources = self.retriever(question, k=3)
         context = "\n".join(english_docs)
-        
-        response = self.llm_chain.run({"context": context, "question": question})
+
+        response = self.llm_chain.invoke({"context": context, "question": question})
         sources_with_bold = []
         for i, source in enumerate(sources):
             source_text = english_docs[i]
-            #source_text = re.sub(r'<b>(.*?)</b>', r'**\1**', source_text)  # Replace <b> with markdown bold
             sources_with_bold.append({
                 "name": f"{source['seder']} {source['tractate']} Chapter {source['chapter']}, Mishnah {source['mishnah']}",
                 "text": source_text
             })
-        
+
         return response, sources_with_bold
 
 # Function to initialize the English QA Chain
 def EngQAChain():
     return SimpleQAChain(simple_retriever, english_llm_chain)
-
