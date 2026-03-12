@@ -1,12 +1,12 @@
 import re
 from langchain.chains import LLMChain, RetrievalQA
-from langchain_community.chat_models import BedrockChat
+from langchain_aws import ChatBedrock
 from langchain.prompts import PromptTemplate
 from chroma import simple_retriever
 
 # Initialize AWS Bedrock for Claude Sonnet with specific configurations for generation
-generation_llm = BedrockChat(
-    model_id="global.anthropic.claude-sonnet-4-5-20250929-v1:0"
+generation_llm = ChatBedrock(
+    model_id="us.anthropic.claude-sonnet-4-5-20250929-v1:0"
 )
 
 # Define the prompt template for English answers
