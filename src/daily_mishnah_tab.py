@@ -3,6 +3,7 @@ import datetime
 from zoneinfo import ZoneInfo
 
 import streamlit as st
+import streamlit.components.v1 as components
 
 import mishnah_calendar as mc
 import progress_store as ps
@@ -179,8 +180,6 @@ def _open_progress_dialog(effective_id, cycle_id, days, state_key, current_day_n
             day_nums_by_tractate.setdefault(r.tractate, set()).add(d.day_num)
     tractates = list(day_nums_by_tractate)  # chronological, by first appearance
     total_days = len(days)
-    window_key = f"cal_window_{cycle_id}"
-    st.session_state[window_key] = [max(1, current_day_num - 10), min(total_days, current_day_num + 10)]
     hebrew_year = int(cycle_id)
 
     @st.dialog("Full schedule & progress", width="large")
@@ -201,19 +200,10 @@ def _open_progress_dialog(effective_id, cycle_id, days, state_key, current_day_n
         )
 
         st.caption("Scroll and tap a day to jump to its text, or tap the checkmark to mark it done.")
-        w_start, w_end = st.session_state[window_key]
-        exp_col1, exp_col2 = st.columns(2)
-        if w_start > 1:
-            if exp_col1.button("⬆️ Earlier days", key=f"cal_earlier_{cycle_id}", width="stretch"):
-                st.session_state[window_key][0] = max(1, w_start - 20)
-                st.rerun()
-        if w_end < total_days:
-            if exp_col2.button("⬇️ Later days", key=f"cal_later_{cycle_id}", width="stretch"):
-                st.session_state[window_key][1] = min(total_days, w_end + 20)
-                st.rerun()
-
+        current_row_id = f"cal-row-{cycle_id}-{current_day_num}"
         with st.container(height=450):
-            for d in days[w_start - 1 : w_end]:
+            for d in days:
+                st.markdown(f"<span id='cal-row-{cycle_id}-{d.day_num}'></span>", unsafe_allow_html=True)
                 row_done, row_go = st.columns([1, 6])
                 is_done = d.day_num in completed_days
                 row_done.button(
@@ -236,6 +226,21 @@ def _open_progress_dialog(effective_id, cycle_id, days, state_key, current_day_n
                 ):
                     st.session_state[state_key] = d.day_num
                     st.rerun()
+
+        # st.container(height=...) has no native "default scroll position" API,
+        # so scroll the current day's row into view via its own invisible
+        # anchor span once the dialog's DOM has settled.
+        components.html(
+            f"""
+            <script>
+            setTimeout(function() {{
+                var el = window.parent.document.getElementById('{current_row_id}');
+                if (el) {{ el.scrollIntoView({{block: 'center', behavior: 'instant'}}); }}
+            }}, 200);
+            </script>
+            """,
+            height=0,
+        )
 
     _dialog()
 
