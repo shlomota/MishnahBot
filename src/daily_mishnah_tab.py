@@ -137,8 +137,18 @@ def _render_reading(reading, language_mode, commentary_choice, now_str):
     st.link_button("Open on Sefaria ↗", reading.sefaria_url, width="stretch")
 
 
-def _render_settings(user_id, prefs, available_commentary_names):
-    with st.expander("Display settings", icon="⚙️"):
+def _render_settings(user_id, prefs, available_commentary_names, state_key, current_day, total_days):
+    with st.expander("Settings & jump to day", icon="⚙️"):
+        picked = st.number_input(
+            "Jump to day #",
+            min_value=1,
+            max_value=total_days,
+            value=current_day,
+        )
+        if int(picked) != current_day:
+            st.session_state[state_key] = int(picked)
+            st.rerun()
+
         language_mode = st.radio(
             "Language",
             up.LANGUAGE_MODES,
@@ -195,27 +205,19 @@ def render_daily_mishnah_tab():
     def _clamp(day_num):
         return max(1, min(total_days, day_num))
 
+    NAV_PREV, NAV_TODAY, NAV_NEXT = "◀ Prev", "Today", "Next ▶"
     on_today = st.session_state[state_key] == today_day_num
-    nav_cols = st.columns(4 if not on_today else 3)
-    if nav_cols[0].button("◀ Prev"):
-        st.session_state[state_key] = _clamp(st.session_state[state_key] - 1)
-    if nav_cols[1].button("Next ▶"):
-        st.session_state[state_key] = _clamp(st.session_state[state_key] + 1)
-    next_col = 2
-    if not on_today:
-        if nav_cols[2].button("Today"):
+    nav_options = [NAV_PREV, NAV_NEXT] if on_today else [NAV_PREV, NAV_TODAY, NAV_NEXT]
+    nav_choice = st.segmented_control("Navigate", nav_options, label_visibility="collapsed", key="nav_seg")
+    if nav_choice is not None:
+        if nav_choice == NAV_PREV:
+            st.session_state[state_key] = _clamp(st.session_state[state_key] - 1)
+        elif nav_choice == NAV_NEXT:
+            st.session_state[state_key] = _clamp(st.session_state[state_key] + 1)
+        elif nav_choice == NAV_TODAY:
             st.session_state[state_key] = today_day_num
-        next_col = 3
-    with nav_cols[next_col].popover("Jump to day"):
-        picked = st.number_input(
-            "Day #",
-            min_value=1,
-            max_value=total_days,
-            value=st.session_state[state_key],
-        )
-        if int(picked) != st.session_state[state_key]:
-            st.session_state[state_key] = int(picked)
-            st.rerun()
+        st.session_state.nav_seg = None
+        st.rerun()
 
     day = days_by_num[st.session_state[state_key]]
     is_today = day.day_num == today_day_num
@@ -227,7 +229,9 @@ def render_daily_mishnah_tab():
     for reading in day.readings:
         for name, _index_title in sc.available_commentaries(reading.sefaria_ref, now_str):
             commentary_names.add(name)
-    language_mode, commentary, _font_size = _render_settings(user_id, prefs, sorted(commentary_names))
+    language_mode, commentary, _font_size = _render_settings(
+        user_id, prefs, sorted(commentary_names), state_key, st.session_state[state_key], total_days
+    )
 
     header = f"Day {day.day_num} of {total_days} — {day.hebrew_date} ({cycle_id})"
     st.subheader(header + " · today" if is_today else header)
