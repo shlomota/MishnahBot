@@ -124,7 +124,6 @@ def _render_reading(reading, language_mode, commentary_choice, now_str):
         # than guessing a "{name} on {book}" pattern, which isn't universal.
         available = dict(sc.available_commentaries(reading.sefaria_ref, now_str))
         commentary_index_title = available.get(commentary_choice)
-        st.write(f"DEBUG commentary_choice={commentary_choice!r} available_keys={list(available)!r} commentary_index_title={commentary_index_title!r}")
         if not commentary_index_title:
             st.caption(f"{commentary_choice} isn't available for this chapter.")
 
@@ -201,7 +200,7 @@ def _open_progress_dialog(
     hebrew_year = int(cycle_id)
     learning_days = [d for d in days if d.readings or d.is_siyum]  # skip Shabbat/holiday blanks
 
-    @st.dialog("Full schedule & progress", width="large")
+    @st.dialog("Full schedule & progress", width="large", on_dismiss="rerun")
     def _dialog():
         completed_days = ps.get_completed_days(effective_id, cycle_id)
         pct = len(completed_days) / total_days
@@ -286,7 +285,7 @@ def _save_all_prefs(effective_id):
 
 
 def _open_settings_dialog(cookie_user_id, effective_id, prefs, available_commentary_names):
-    @st.dialog("Settings", icon="⚙️")
+    @st.dialog("Settings", icon="⚙️", on_dismiss="rerun")
     def _dialog():
         st.radio(
             "Language",
@@ -350,7 +349,6 @@ def render_daily_mishnah_tab():
     effective_id = ul.effective_id(user_id)  # the linked email, once synced; else this browser's own id
 
     prefs = up.get_prefs(effective_id)
-    st.write(f"DEBUG top: user_id={user_id!r} effective_id={effective_id!r} prefs={prefs!r}")
     st.markdown(_text_css(up.FONT_SIZE_REM[prefs["font_size"]]), unsafe_allow_html=True)
     st.title("Daily Mishnah")
     st.caption(
