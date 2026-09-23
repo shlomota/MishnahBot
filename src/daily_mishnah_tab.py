@@ -205,6 +205,14 @@ def render_daily_mishnah_tab():
     def _clamp(day_num):
         return max(1, min(total_days, day_num))
 
+    # A widget's session_state key can't be reassigned in the same run it was
+    # instantiated in, so clearing the segmented control's selection (it's a
+    # momentary action, not a persistent choice) has to happen at the top of
+    # the *next* run, before the widget below re-instantiates with that key.
+    if st.session_state.get("_reset_nav_seg"):
+        st.session_state.nav_seg = None
+        st.session_state._reset_nav_seg = False
+
     NAV_PREV, NAV_TODAY, NAV_NEXT = "◀ Prev", "Today", "Next ▶"
     on_today = st.session_state[state_key] == today_day_num
     nav_options = [NAV_PREV, NAV_NEXT] if on_today else [NAV_PREV, NAV_TODAY, NAV_NEXT]
@@ -216,7 +224,7 @@ def render_daily_mishnah_tab():
             st.session_state[state_key] = _clamp(st.session_state[state_key] + 1)
         elif nav_choice == NAV_TODAY:
             st.session_state[state_key] = today_day_num
-        st.session_state.nav_seg = None
+        st.session_state._reset_nav_seg = True
         st.rerun()
 
     day = days_by_num[st.session_state[state_key]]
