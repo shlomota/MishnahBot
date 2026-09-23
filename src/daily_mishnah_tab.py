@@ -16,7 +16,7 @@ import user_prefs as up
 APP_TIMEZONE = ZoneInfo("America/New_York")
 
 
-HEADER_RATIO = 0.5
+HEADER_RATIO = 1.15
 # rem is tied to the browser's root font-size, not viewport width, so without
 # this the same size preference renders at the identical physical size on a
 # 27" monitor as on a phone - which reads as oversized on desktop. Scale down
@@ -42,8 +42,8 @@ def _text_css(font_size_rem):
     margin-bottom: 0.9rem; opacity: 0.92; overflow-wrap: break-word; word-break: break-word; max-width: 100%;
 }}
 .mishnah-header {{
-    direction: rtl; text-align: right; font-weight: 500; opacity: 0.6;
-    font-size: {font_size_rem * HEADER_RATIO}rem; margin-top: 0.9rem;
+    direction: rtl; text-align: right; font-weight: 700; opacity: 1;
+    font-size: {font_size_rem * HEADER_RATIO}rem; margin-top: 1.1rem;
 }}
 .commentary-block {{ border-left: 3px solid rgba(128,128,128,0.35); padding-left: 0.8rem; margin: 0.3rem 0 0.7rem 0; }}
 @media (min-width: {DESKTOP_BREAKPOINT_PX}px) {{
