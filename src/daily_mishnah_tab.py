@@ -245,42 +245,64 @@ def _open_progress_dialog(effective_id, cycle_id, days, state_key, current_day_n
     _dialog()
 
 
-def _render_settings(cookie_user_id, effective_id, prefs, available_commentary_names):
-    with st.expander("Settings", icon="⚙️"):
-        language_mode = st.radio(
+def _save_all_prefs(effective_id):
+    # An on_change callback (see _toggle_day_done for why) rather than a
+    # plain "if changed: ...st.rerun()", so changing one setting doesn't
+    # close the dialog before you've had a chance to change another.
+    up.set_prefs(
+        effective_id,
+        st.session_state.pref_language_mode,
+        st.session_state.pref_commentary,
+        st.session_state.pref_font_size,
+    )
+
+
+def _open_settings_dialog(cookie_user_id, effective_id, prefs, available_commentary_names):
+    @st.dialog("Settings", icon="⚙️")
+    def _dialog():
+        st.radio(
             "Language",
             up.LANGUAGE_MODES,
             index=up.LANGUAGE_MODES.index(prefs["language_mode"]),
             horizontal=True,
             key="pref_language_mode",
+            on_change=_save_all_prefs,
+            args=(effective_id,),
         )
         options = ["None"] + available_commentary_names
         current = prefs["commentary"] if prefs["commentary"] in options else "None"
-        commentary = st.selectbox(
+        st.selectbox(
             "Commentary",
             options,
             index=options.index(current),
             key="pref_commentary",
+            on_change=_save_all_prefs,
+            args=(effective_id,),
         )
-        font_size = st.select_slider(
+        st.select_slider(
             "Text size",
             up.FONT_SIZES,
             value=prefs["font_size"],
             key="pref_font_size",
+            on_change=_save_all_prefs,
+            args=(effective_id,),
         )
-        if (language_mode, commentary, font_size) != (prefs["language_mode"], prefs["commentary"], prefs["font_size"]):
-            up.set_prefs(effective_id, language_mode, commentary, font_size)
-            st.rerun()
 
         st.divider()
         linked_email = ul.get_linked_email(cookie_user_id)
         if linked_email:
-            st.caption(f"🔗 Synced as **{linked_email}** — enter it on other devices to share progress there too.")
+            st.caption(
+                f"🔗 Synced as **{linked_email}** — enter it on other devices to share "
+                "progress and these settings there too."
+            )
             if st.button("Unlink this browser", key="unlink_email_btn"):
                 ul.unlink(cookie_user_id)
                 st.rerun()
         else:
-            st.caption("Sync progress across devices (optional): enter the same email on each one.")
+            st.caption(
+                "Sync progress and display settings across devices (optional): "
+                "enter the same email on each one."
+            )
             email_input = st.text_input("Email", key="link_email_input", placeholder="you@example.com")
             if st.button("Sync this browser", key="link_email_btn"):
                 if ul.is_valid_email(email_input):
@@ -288,7 +310,8 @@ def _render_settings(cookie_user_id, effective_id, prefs, available_commentary_n
                     st.rerun()
                 else:
                     st.error("Enter a valid email address.")
-    return language_mode, commentary, font_size
+
+    _dialog()
 
 
 def render_daily_mishnah_tab():
@@ -304,7 +327,7 @@ def render_daily_mishnah_tab():
     st.caption(
         "Following R. Ethan Tucker's Hebrew-year-aligned calendar to finish all of Shishah Sedarim in one year. "
         "Texts are retrieved from [Sefaria](https://www.sefaria.org). "
-        "Optionally sync your progress across devices with an email in Settings."
+        "Optionally sync your progress and settings across devices with an email in Settings."
     )
 
     today = datetime.datetime.now(APP_TIMEZONE).date()
@@ -330,9 +353,9 @@ def render_daily_mishnah_tab():
         st.session_state.nav_seg = None
         st.session_state._reset_nav_seg = False
 
-    NAV_PREV, NAV_TODAY, NAV_NEXT = "◀ Prev", "Today", "Next ▶"
+    NAV_PREV, NAV_TODAY, NAV_NEXT, NAV_PROGRESS, NAV_SETTINGS = "◀ Prev", "Today", "Next ▶", "📋 Progress", "⚙️"
     on_today = st.session_state[state_key] == today_day_num
-    nav_options = [NAV_PREV, NAV_NEXT] if on_today else [NAV_PREV, NAV_TODAY, NAV_NEXT]
+    nav_options = [NAV_PREV] + ([] if on_today else [NAV_TODAY]) + [NAV_NEXT, NAV_PROGRESS, NAV_SETTINGS]
     nav_choice = st.segmented_control("Navigate", nav_options, label_visibility="collapsed", key="nav_seg")
     if nav_choice is not None:
         if nav_choice == NAV_PREV:
@@ -341,25 +364,30 @@ def render_daily_mishnah_tab():
             st.session_state[state_key] = _clamp(st.session_state[state_key] + 1)
         elif nav_choice == NAV_TODAY:
             st.session_state[state_key] = today_day_num
+        elif nav_choice == NAV_PROGRESS:
+            st.session_state["_pending_dialog"] = "progress"
+        elif nav_choice == NAV_SETTINGS:
+            st.session_state["_pending_dialog"] = "settings"
         st.session_state._reset_nav_seg = True
         st.rerun()
 
     day = days_by_num[st.session_state[state_key]]
     is_today = day.day_num == today_day_num
     now_str = datetime.datetime.now().isoformat()
+    language_mode, commentary = prefs["language_mode"], prefs["commentary"]
 
-    if st.button("📋 Full schedule & progress"):
-        _open_progress_dialog(effective_id, cycle_id, days, state_key, day.day_num, today_day_num)
-
-    # Discover which commentaries actually exist for today's reading(s), so the
-    # settings dropdown never offers a commentary that isn't covered.
+    # Discover which commentaries actually exist for this day's reading(s), so
+    # the settings dropdown never offers a commentary that isn't covered.
     commentary_names = set()
     for reading in day.readings:
         for name, _index_title in sc.available_commentaries(reading.sefaria_ref, now_str):
             commentary_names.add(name)
-    language_mode, commentary, _font_size = _render_settings(
-        user_id, effective_id, prefs, sorted(commentary_names)
-    )
+
+    pending_dialog = st.session_state.pop("_pending_dialog", None)
+    if pending_dialog == "progress":
+        _open_progress_dialog(effective_id, cycle_id, days, state_key, day.day_num, today_day_num)
+    elif pending_dialog == "settings":
+        _open_settings_dialog(user_id, effective_id, prefs, sorted(commentary_names))
 
     greg_date = mc.gregorian_date_for(int(cycle_id), day.hebrew_date)
     greg_str = f" · {greg_date.strftime('%B %d, %Y')}" if greg_date else ""
