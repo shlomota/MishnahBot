@@ -168,8 +168,14 @@ def flatten_to_paragraphs(nested):
     return out
 
 
-def commentary_ref(index_title, chapter_start, chapter_end):
-    slug = index_title.replace(" ", "_")
-    if chapter_end != chapter_start:
-        return f"{slug}.{chapter_start}-{chapter_end}"
-    return f"{slug}.{chapter_start}"
+def commentary_ref(index_title, chapter_num, mishnah_num):
+    """A commentary ref scoped to exactly one mishnah (e.g. Bartenura_on_Mishnah_Beitzah.4.1).
+
+    Fetching per-mishnah rather than per-chapter-range sidesteps a real
+    inconsistency in Sefaria's range API: a commentary's own segment count
+    for a chapter doesn't reliably match that chapter's mishnah count within
+    a multi-chapter range fetch (most visibly on the non-first chapter), so
+    positional alignment there isn't trustworthy. Per-mishnah refs have no
+    such ambiguity - each fetch is already scoped to exactly the right unit.
+    """
+    return f"{index_title.replace(' ', '_')}.{chapter_num}.{mishnah_num}"

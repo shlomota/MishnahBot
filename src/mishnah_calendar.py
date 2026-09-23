@@ -99,6 +99,31 @@ TRACTATE_TO_SEFARIA = {
     "Zevahim": "Mishnah Zevachim",
 }
 
+SEDARIM_ORDER = ["Zeraim", "Moed", "Nashim", "Nezikin", "Kodashim", "Tahorot"]
+
+# Tractate name (in this calendar's own spelling) -> which of the six orders
+# it belongs to, for tracking completed tractates/sedarim.
+SEDER_OF_TRACTATE = {
+    "Berakhot": "Zeraim", "Peah": "Zeraim", "Demai": "Zeraim", "Kilayim": "Zeraim",
+    "Sheviit": "Zeraim", "Terumot": "Zeraim", "Ma'aserot": "Zeraim", "Ma'aser Sheni": "Zeraim",
+    "Hallah": "Zeraim", "Orlah": "Zeraim", "Bikkurim": "Zeraim",
+    "Shabbat": "Moed", "Eruvin": "Moed", "Pesahim": "Moed", "Shekalim": "Moed",
+    "Yoma": "Moed", "Sukkah": "Moed", "Beitzah": "Moed", "Rosh Hashanah": "Moed",
+    "Taanit": "Moed", "Megillah": "Moed", "Moed Katan": "Moed", "Hagigah": "Moed",
+    "Yevamot": "Nashim", "Ketubot": "Nashim", "Nedarim": "Nashim", "Nazir": "Nashim",
+    "Sotah": "Nashim", "Gittin": "Nashim", "Kiddushin": "Nashim",
+    "Bava Kama": "Nezikin", "Bava Metzia": "Nezikin", "Bava Batra": "Nezikin",
+    "Sanhedrin": "Nezikin", "Makkot": "Nezikin", "Shevuot": "Nezikin", "Eduyot": "Nezikin",
+    "Avodah Zarah": "Nezikin", "Avot": "Nezikin", "Horayot": "Nezikin",
+    "Zevahim": "Kodashim", "Menahot": "Kodashim", "Hullin": "Kodashim", "Bekhorot": "Kodashim",
+    "Arakhin": "Kodashim", "Temurah": "Kodashim", "Kereitot": "Kodashim",
+    "Me'ilah": "Kodashim", "Meilah": "Kodashim", "Tamid": "Kodashim", "Middot": "Kodashim",
+    "Kinnim": "Kodashim",
+    "Keilim": "Tahorot", "Aholot": "Tahorot", "Negaim": "Tahorot", "Parah": "Tahorot",
+    "Tahorot": "Tahorot", "Mikvaot": "Tahorot", "Niddah": "Tahorot", "Makshirin": "Tahorot",
+    "Zavim": "Tahorot", "Tevul Yom": "Tahorot", "Yadayim": "Tahorot", "Uktzin": "Tahorot",
+}
+
 CHAPTER_RE = re.compile(r"^(.+?)\s+(\d+)(?:-(\d+))?$")
 
 

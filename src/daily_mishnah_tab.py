@@ -72,63 +72,41 @@ def _render_commentary_block(label, he, en, language_mode):
         st.markdown("</div>", unsafe_allow_html=True)
 
 
-def _render_interleaved(reading, data, c_data, commentary_choice, language_mode):
+def _render_interleaved(reading, data, commentary_index_title, commentary_choice, language_mode, now_str):
     """Render each mishnah followed immediately by its own commentary, if any.
 
-    Sefaria doesn't reliably segment every commentary one-per-mishnah within a
-    multi-chapter range fetch (a commentary's own natural section count for a
-    chapter can differ from that chapter's mishnah count, and in practice the
-    non-first chapter of a range often collapses to a single combined slot).
-    So per-mishnah interleaving is only used when a chapter's commentary
-    segment count actually matches its mishnah count; otherwise that whole
-    chapter's commentary is shown as one block after its last mishnah, rather
-    than silently mis-attributing or dropping it.
+    Commentary is fetched per-mishnah (see sefaria_client.commentary_ref) so
+    there's no positional-alignment guessing between a chapter's mishnah
+    count and the commentary's own segment count for that chapter - each
+    fetch is already scoped to exactly the right mishnah.
     """
     is_range = reading.chapter_end != reading.chapter_start
     he_by_chapter = data["he"] if is_range else [data["he"]]
     en_by_chapter = data["text"] if is_range else [data["text"]]
 
-    he_com_by_chapter = []
-    en_com_by_chapter = []
-    if c_data:
-        he_com_by_chapter = c_data["he"] if is_range else [c_data["he"]]
-        en_com_by_chapter = c_data["text"] if is_range else [c_data["text"]]
-
     for chapter_offset in range(max(len(he_by_chapter), len(en_by_chapter))):
         chapter_num = reading.chapter_start + chapter_offset
         he_chapter = he_by_chapter[chapter_offset] if chapter_offset < len(he_by_chapter) else []
         en_chapter = en_by_chapter[chapter_offset] if chapter_offset < len(en_by_chapter) else []
-        he_com_chapter = he_com_by_chapter[chapter_offset] if chapter_offset < len(he_com_by_chapter) else []
-        en_com_chapter = en_com_by_chapter[chapter_offset] if chapter_offset < len(en_com_by_chapter) else []
 
-        mishnah_count = max(len(he_chapter), len(en_chapter))
-        com_aligned = commentary_choice and commentary_choice != "None" and mishnah_count and (
-            len(he_com_chapter) == mishnah_count or len(en_com_chapter) == mishnah_count
-        )
-
-        for mishnah_offset in range(mishnah_count):
+        for mishnah_offset in range(max(len(he_chapter), len(en_chapter))):
+            mishnah_num = mishnah_offset + 1
             he = he_chapter[mishnah_offset] if mishnah_offset < len(he_chapter) else ""
             en = en_chapter[mishnah_offset] if mishnah_offset < len(en_chapter) else ""
-            header = f"פרק {sc.hebrew_numeral(chapter_num)} משנה {sc.hebrew_numeral(mishnah_offset + 1)}"
+            header = f"פרק {sc.hebrew_numeral(chapter_num)} משנה {sc.hebrew_numeral(mishnah_num)}"
             st.markdown(f"<div class='mishnah-header'>{header}</div>", unsafe_allow_html=True)
             if language_mode in ("Hebrew", "Bilingual") and he:
                 st.markdown(f"<div class='mishnah-he'>{he}</div>", unsafe_allow_html=True)
             if language_mode in ("English", "Bilingual") and en:
                 st.markdown(f"<div class='mishnah-en'>{en}</div>", unsafe_allow_html=True)
 
-            if com_aligned:
-                he_com_raw = he_com_chapter[mishnah_offset] if mishnah_offset < len(he_com_chapter) else None
-                en_com_raw = en_com_chapter[mishnah_offset] if mishnah_offset < len(en_com_chapter) else None
-                he_com = "<br><br>".join(sc.flatten_to_paragraphs(he_com_raw)) if he_com_raw else ""
-                en_com = "<br><br>".join(sc.flatten_to_paragraphs(en_com_raw)) if en_com_raw else ""
+            if commentary_index_title:
+                c_ref = sc.commentary_ref(commentary_index_title, chapter_num, mishnah_num)
+                c_data = sc.fetch_text(c_ref, now_str)
+                he_com = "<br><br>".join(sc.flatten_to_paragraphs(c_data["he"])) if c_data else ""
+                en_com = "<br><br>".join(sc.flatten_to_paragraphs(c_data["text"])) if c_data else ""
                 if he_com or en_com:
                     _render_commentary_block(commentary_choice, he_com, en_com, language_mode)
-
-        if commentary_choice and commentary_choice != "None" and not com_aligned and (he_com_chapter or en_com_chapter):
-            he_com = "<br><br>".join(sc.flatten_to_paragraphs(he_com_chapter))
-            en_com = "<br><br>".join(sc.flatten_to_paragraphs(en_com_chapter))
-            if he_com or en_com:
-                _render_commentary_block(f"{commentary_choice} — chapter {chapter_num}", he_com, en_com, language_mode)
 
 
 def _render_reading(reading, language_mode, commentary_choice, now_str):
@@ -139,54 +117,102 @@ def _render_reading(reading, language_mode, commentary_choice, now_str):
         st.link_button("Open on Sefaria ↗", reading.sefaria_url, width="stretch")
         return
 
-    c_data = None
+    commentary_index_title = None
     if commentary_choice and commentary_choice != "None":
         # Look up this reading's own index_title for the chosen commentator name
         # (it varies per tractate, e.g. "Bartenura on Mishnah Beitzah") rather
         # than guessing a "{name} on {book}" pattern, which isn't universal.
         available = dict(sc.available_commentaries(reading.sefaria_ref, now_str))
-        index_title = available.get(commentary_choice)
-        if index_title:
-            c_ref = sc.commentary_ref(index_title, reading.chapter_start, reading.chapter_end)
-            c_data = sc.fetch_text(c_ref, now_str)
-        if not c_data or not (c_data["he"] or c_data["text"]):
+        commentary_index_title = available.get(commentary_choice)
+        if not commentary_index_title:
             st.caption(f"{commentary_choice} isn't available for this chapter.")
-            c_data = None
 
-    _render_interleaved(reading, data, c_data, commentary_choice, language_mode)
+    _render_interleaved(reading, data, commentary_index_title, commentary_choice, language_mode, now_str)
 
     st.link_button("Open on Sefaria ↗", reading.sefaria_url, width="stretch")
 
 
-def _toggle_day_done(effective_id, cycle_id, day_num, currently_done):
+def _build_tractate_index(days):
+    """(day_nums_by_tractate, tractates_by_seder) for one calendar cycle."""
+    day_nums_by_tractate = {}
+    for d in days:
+        for r in d.readings:
+            day_nums_by_tractate.setdefault(r.tractate, set()).add(d.day_num)
+    tractates_by_seder = {}
+    for tractate in day_nums_by_tractate:
+        seder = mc.SEDER_OF_TRACTATE.get(tractate)
+        if seder:
+            tractates_by_seder.setdefault(seder, set()).add(tractate)
+    return day_nums_by_tractate, tractates_by_seder
+
+
+def _fully_completed_tractates(completed_days, day_nums_by_tractate):
+    return {t for t, nums in day_nums_by_tractate.items() if nums and nums.issubset(completed_days)}
+
+
+def _fully_completed_sedarim(completed_tractates, tractates_by_seder):
+    return {s for s, ts in tractates_by_seder.items() if ts and ts.issubset(completed_tractates)}
+
+
+def _record_completions(effective_id, cycle_id, day_nums_by_tractate, tractates_by_seder, before_completed_days):
+    # Diffs completed-before-this-action vs completed-after, so a tractate/
+    # seder only triggers its celebration once, on whichever action actually
+    # finished it - checked here (not where the celebration is shown) so it
+    # works no matter which of the several places can complete a day.
+    after_completed_days = ps.get_completed_days(effective_id, cycle_id)
+    before_tractates = _fully_completed_tractates(before_completed_days, day_nums_by_tractate)
+    after_tractates = _fully_completed_tractates(after_completed_days, day_nums_by_tractate)
+    newly_tractates = after_tractates - before_tractates
+    if newly_tractates:
+        st.session_state.setdefault("_celebrate_tractates", set()).update(newly_tractates)
+
+    before_sedarim = _fully_completed_sedarim(before_tractates, tractates_by_seder)
+    after_sedarim = _fully_completed_sedarim(after_tractates, tractates_by_seder)
+    newly_sedarim = after_sedarim - before_sedarim
+    if newly_sedarim:
+        st.session_state.setdefault("_celebrate_sedarim", set()).update(newly_sedarim)
+
+
+def _toggle_day_done(effective_id, cycle_id, day_num, currently_done, day_nums_by_tractate, tractates_by_seder):
     # An on_click callback rather than a plain "if button: ...st.rerun()":
     # an explicit st.rerun() from inside a dialog closes it, but a widget's
     # own natural rerun (which a callback still goes through) leaves it
     # open - confirmed empirically - so repeatedly marking days here doesn't
     # kick you out of the list after every tap.
+    before = ps.get_completed_days(effective_id, cycle_id)
     ps.set_day_completed(effective_id, cycle_id, day_num, not currently_done, datetime.datetime.now().isoformat())
+    _record_completions(effective_id, cycle_id, day_nums_by_tractate, tractates_by_seder, before)
 
 
-def _mark_tractate_done(effective_id, cycle_id, day_nums):
+def _mark_tractate_done(effective_id, cycle_id, day_nums, day_nums_by_tractate, tractates_by_seder):
+    before = ps.get_completed_days(effective_id, cycle_id)
     now_str = datetime.datetime.now().isoformat()
     for day_num in day_nums:
         ps.set_day_completed(effective_id, cycle_id, day_num, True, now_str)
+    _record_completions(effective_id, cycle_id, day_nums_by_tractate, tractates_by_seder, before)
 
 
-def _open_progress_dialog(effective_id, cycle_id, days, state_key, current_day_num, today_day_num):
-    day_nums_by_tractate = {}
-    for d in days:
-        for r in d.readings:
-            day_nums_by_tractate.setdefault(r.tractate, set()).add(d.day_num)
+def _open_progress_dialog(
+    effective_id, cycle_id, days, state_key, current_day_num, today_day_num, day_nums_by_tractate, tractates_by_seder
+):
     tractates = list(day_nums_by_tractate)  # chronological, by first appearance
     total_days = len(days)
     hebrew_year = int(cycle_id)
+    learning_days = [d for d in days if d.readings or d.is_siyum]  # skip Shabbat/holiday blanks
 
     @st.dialog("Full schedule & progress", width="large")
     def _dialog():
         completed_days = ps.get_completed_days(effective_id, cycle_id)
         pct = len(completed_days) / total_days
         st.progress(pct, text=f"{len(completed_days)} / {total_days} days completed ({pct:.0%})")
+
+        completed_tractates = _fully_completed_tractates(completed_days, day_nums_by_tractate)
+        completed_sedarim = _fully_completed_sedarim(completed_tractates, tractates_by_seder)
+        sum_col1, sum_col2 = st.columns(2)
+        with sum_col1.expander(f"🎈 Tractates: {len(completed_tractates)}/{len(day_nums_by_tractate)}"):
+            st.write(", ".join(t for t in tractates if t in completed_tractates) or "None yet")
+        with sum_col2.expander(f"🏆 Sedarim: {len(completed_sedarim)}/{len(tractates_by_seder)}"):
+            st.write(", ".join(s for s in mc.SEDARIM_ORDER if s in completed_sedarim) or "None yet")
 
         mark_col, btn_col = st.columns([2, 1])
         chosen_tractate = mark_col.selectbox(
@@ -196,23 +222,24 @@ def _open_progress_dialog(effective_id, cycle_id, days, state_key, current_day_n
             "Mark all",
             key=f"mark_tractate_btn_{cycle_id}",
             on_click=_mark_tractate_done,
-            args=(effective_id, cycle_id, day_nums_by_tractate[chosen_tractate]),
+            args=(effective_id, cycle_id, day_nums_by_tractate[chosen_tractate], day_nums_by_tractate, tractates_by_seder),
         )
 
         st.caption("Scroll and tap a day to jump to its text, or tap the checkmark to mark it done.")
         current_row_id = f"cal-row-{cycle_id}-{current_day_num}"
         with st.container(height=450):
-            for d in days:
+            for d in learning_days:
                 st.markdown(f"<span id='cal-row-{cycle_id}-{d.day_num}'></span>", unsafe_allow_html=True)
                 row_done, row_go = st.columns([1, 6])
                 is_done = d.day_num in completed_days
                 row_done.button(
                     "✅" if is_done else "⬜",
                     key=f"cal_toggle_{cycle_id}_{d.day_num}",
+                    type="tertiary",
                     on_click=_toggle_day_done,
-                    args=(effective_id, cycle_id, d.day_num, is_done),
+                    args=(effective_id, cycle_id, d.day_num, is_done, day_nums_by_tractate, tractates_by_seder),
                 )
-                content = d.raw_schedule or ("Siyum" if d.is_siyum else "No reading")
+                content = d.raw_schedule or "Siyum"
                 greg = mc.gregorian_date_for(hebrew_year, d.hebrew_date)
                 greg_str = greg.strftime("%b %d") if greg else ""
                 today_marker = "📍 " if d.day_num == today_day_num else ""
@@ -222,7 +249,7 @@ def _open_progress_dialog(effective_id, cycle_id, days, state_key, current_day_n
                     label,
                     key=f"cal_goto_{cycle_id}_{d.day_num}",
                     width="stretch",
-                    type="primary" if is_current else "secondary",
+                    type="primary" if is_current else "tertiary",
                 ):
                     st.session_state[state_key] = d.day_num
                     st.rerun()
@@ -335,8 +362,19 @@ def render_daily_mishnah_tab():
     days_by_num = {d.day_num: d for d in days}
     total_days = len(days)
     today_day_num = today_day.day_num if today_day else 1
+    day_nums_by_tractate, tractates_by_seder = _build_tractate_index(days)
 
     completed_days = ps.get_completed_days(effective_id, cycle_id)
+
+    celebrate_sedarim = st.session_state.pop("_celebrate_sedarim", None)
+    celebrate_tractates = st.session_state.pop("_celebrate_tractates", None)
+    if celebrate_sedarim:
+        st.balloons()
+        st.snow()
+        st.success(f"🏆 Seder complete: {', '.join(sorted(celebrate_sedarim))}!")
+    elif celebrate_tractates:
+        st.balloons()
+        st.success(f"🎈 Tractate complete: {', '.join(sorted(celebrate_tractates))}!")
 
     state_key = f"daily_mishnah_day_{cycle_id}"
     if state_key not in st.session_state:
@@ -385,7 +423,9 @@ def render_daily_mishnah_tab():
 
     pending_dialog = st.session_state.pop("_pending_dialog", None)
     if pending_dialog == "progress":
-        _open_progress_dialog(effective_id, cycle_id, days, state_key, day.day_num, today_day_num)
+        _open_progress_dialog(
+            effective_id, cycle_id, days, state_key, day.day_num, today_day_num, day_nums_by_tractate, tractates_by_seder
+        )
     elif pending_dialog == "settings":
         _open_settings_dialog(user_id, effective_id, prefs, sorted(commentary_names))
 
@@ -413,7 +453,9 @@ def render_daily_mishnah_tab():
     # target is only ~13px, well under a usable mobile touch target.
     btn_label = "✅ Learned — tap to unmark" if done else "☐ Mark this day as learned"
     if st.button(btn_label, width="stretch", type="secondary" if done else "primary"):
+        before = completed_days
         ps.set_day_completed(effective_id, cycle_id, day.day_num, not done, now_str)
+        _record_completions(effective_id, cycle_id, day_nums_by_tractate, tractates_by_seder, before)
         st.rerun()
 
     st.divider()
