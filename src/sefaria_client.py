@@ -1,0 +1,126 @@
+"""Fetches Mishnah/commentary text from Sefaria's API, cached permanently in SQLite.
+
+Sefaria's texts don't change, so once a ref is fetched it's cached forever.
+This makes repeat views instant/offline-independent of Sefaria's own uptime,
+and lets us pre-warm upcoming days ahead of time.
+"""
+import json
+import os
+import sqlite3
+from contextlib import contextmanager
+
+import requests
+
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sefaria_cache.db")
+API_BASE = "https://www.sefaria.org/api"
+REQUEST_TIMEOUT = 10
+
+
+@contextmanager
+def _connect():
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cache (
+                cache_key TEXT PRIMARY KEY,
+                payload TEXT NOT NULL,
+                fetched_at TEXT NOT NULL
+            )
+            """
+        )
+        yield conn
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def _cache_get(key):
+    with _connect() as conn:
+        row = conn.execute("SELECT payload FROM cache WHERE cache_key = ?", (key,)).fetchone()
+    return json.loads(row[0]) if row else None
+
+
+def _cache_set(key, payload, now_str):
+    with _connect() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO cache (cache_key, payload, fetched_at) VALUES (?, ?, ?)",
+            (key, json.dumps(payload), now_str),
+        )
+
+
+def _get_json(path, now_str):
+    key = f"GET {path}"
+    cached = _cache_get(key)
+    if cached is not None:
+        return cached
+    resp = requests.get(f"{API_BASE}{path}", timeout=REQUEST_TIMEOUT)
+    resp.raise_for_status()
+    data = resp.json()
+    _cache_set(key, data, now_str)
+    return data
+
+
+def fetch_text(ref, now_str):
+    """Return {'he': [...], 'text': [...]} segment lists for a ref, cached forever.
+
+    Returns None if the ref can't be fetched (network error, doesn't exist, etc).
+    """
+    try:
+        data = _get_json(f"/texts/{ref}", now_str)
+    except (requests.RequestException, ValueError):
+        return None
+    if data.get("error"):
+        return None
+    he = data.get("he") or []
+    text = data.get("text") or []
+    # Flatten one level if this is a multi-section (chapter-range) response.
+    if he and isinstance(he[0], list):
+        he = [seg for chapter in he for seg in chapter]
+    if text and isinstance(text[0], list):
+        text = [seg for chapter in text for seg in chapter]
+    return {"he": he, "text": text}
+
+
+def available_commentaries(ref, now_str):
+    """Return sorted list of commentator display names available for a ref."""
+    try:
+        data = _get_json(f"/related/{ref}", now_str)
+    except (requests.RequestException, ValueError):
+        return []
+    names = set()
+    index_titles = {}
+    for link in data.get("links", []):
+        if link.get("category") != "Commentary":
+            continue
+        collective = link.get("collectiveTitle") or {}
+        name = collective.get("en")
+        if not name:
+            continue
+        names.add(name)
+        index_titles.setdefault(name, link.get("index_title"))
+    return sorted((name, index_titles[name]) for name in names)
+
+
+def flatten_to_paragraphs(nested):
+    """Recursively join an arbitrarily-nested list of HTML strings into a flat list.
+
+    Some commentaries nest more deeply than the base Mishnah text (a list of
+    per-lemma fragments within each mishnah), so depth isn't predictable -
+    just collect every leaf string in order.
+    """
+    if not nested:
+        return []
+    if isinstance(nested, str):
+        return [nested] if nested else []
+    out = []
+    for item in nested:
+        out.extend(flatten_to_paragraphs(item))
+    return out
+
+
+def commentary_ref(index_title, chapter_start, chapter_end):
+    slug = index_title.replace(" ", "_")
+    if chapter_end != chapter_start:
+        return f"{slug}.{chapter_start}-{chapter_end}"
+    return f"{slug}.{chapter_start}"
