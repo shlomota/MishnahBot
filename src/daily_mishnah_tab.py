@@ -124,6 +124,7 @@ def _render_reading(reading, language_mode, commentary_choice, now_str):
         # than guessing a "{name} on {book}" pattern, which isn't universal.
         available = dict(sc.available_commentaries(reading.sefaria_ref, now_str))
         commentary_index_title = available.get(commentary_choice)
+        st.write(f"DEBUG commentary_choice={commentary_choice!r} available_keys={list(available)!r} commentary_index_title={commentary_index_title!r}")
         if not commentary_index_title:
             st.caption(f"{commentary_choice} isn't available for this chapter.")
 
