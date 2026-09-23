@@ -350,6 +350,7 @@ def render_daily_mishnah_tab():
     effective_id = ul.effective_id(user_id)  # the linked email, once synced; else this browser's own id
 
     prefs = up.get_prefs(effective_id)
+    st.write(f"DEBUG top: user_id={user_id!r} effective_id={effective_id!r} prefs={prefs!r}")
     st.markdown(_text_css(up.FONT_SIZE_REM[prefs["font_size"]]), unsafe_allow_html=True)
     st.title("Daily Mishnah")
     st.caption(
