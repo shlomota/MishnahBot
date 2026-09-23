@@ -16,7 +16,17 @@ import user_prefs as up
 APP_TIMEZONE = ZoneInfo("America/New_York")
 
 
+HEADER_RATIO = 0.5
+# rem is tied to the browser's root font-size, not viewport width, so without
+# this the same size preference renders at the identical physical size on a
+# 27" monitor as on a phone - which reads as oversized on desktop. Scale down
+# above a phone-width breakpoint instead.
+DESKTOP_BREAKPOINT_PX = 768
+DESKTOP_SCALE = 0.62
+
+
 def _text_css(font_size_rem):
+    desktop_rem = font_size_rem * DESKTOP_SCALE
     # overflow-wrap/word-break/max-width guarantee text reflows to the
     # viewport at any font size instead of forcing horizontal scroll -
     # Streamlit's own viewport meta tag blocks native pinch-zoom, so this
@@ -32,10 +42,15 @@ def _text_css(font_size_rem):
     margin-bottom: 0.9rem; opacity: 0.92; overflow-wrap: break-word; word-break: break-word; max-width: 100%;
 }}
 .mishnah-header {{
-    direction: rtl; text-align: right; font-weight: 600; opacity: 0.6;
-    font-size: {font_size_rem * 0.6}rem; margin-top: 0.9rem;
+    direction: rtl; text-align: right; font-weight: 500; opacity: 0.6;
+    font-size: {font_size_rem * HEADER_RATIO}rem; margin-top: 0.9rem;
 }}
 .commentary-block {{ border-left: 3px solid rgba(128,128,128,0.35); padding-left: 0.8rem; margin: 0.3rem 0 0.7rem 0; }}
+@media (min-width: {DESKTOP_BREAKPOINT_PX}px) {{
+    .mishnah-he {{ font-size: {desktop_rem}rem; }}
+    .mishnah-en {{ font-size: {desktop_rem}rem; }}
+    .mishnah-header {{ font-size: {desktop_rem * HEADER_RATIO}rem; }}
+}}
 </style>
 """
 
@@ -259,9 +274,11 @@ def render_daily_mishnah_tab():
         st.success(f"Completes: {day.completes}")
 
     done = day.day_num in completed_days
-    new_done = st.checkbox("Mark this day as learned", value=done, key=f"done_{cycle_id}_{day.day_num}")
-    if new_done != done:
-        ps.set_day_completed(user_id, cycle_id, day.day_num, new_done, now_str)
+    # A full-width button rather than st.checkbox: the checkbox's own tap
+    # target is only ~13px, well under a usable mobile touch target.
+    btn_label = "✅ Learned — tap to unmark" if done else "☐ Mark this day as learned"
+    if st.button(btn_label, width="stretch", type="secondary" if done else "primary"):
+        ps.set_day_completed(user_id, cycle_id, day.day_num, not done, now_str)
         st.rerun()
 
     st.divider()
