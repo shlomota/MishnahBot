@@ -152,6 +152,36 @@ def _render_reading(reading, language_mode, commentary_choice, now_str):
     st.link_button("Open on Sefaria ↗", reading.sefaria_url, width="stretch")
 
 
+def _open_progress_dialog(user_id, cycle_id, days, completed_days, now_str):
+    @st.dialog("Full schedule & progress", width="large")
+    def _dialog():
+        st.caption("Check off any day directly here — changes save immediately.")
+        rows = [
+            {
+                "Day": d.day_num,
+                "Hebrew Date": d.hebrew_date,
+                "Schedule": d.raw_schedule or ("Siyum" if d.is_siyum else "—"),
+                "Done": d.day_num in completed_days,
+            }
+            for d in days
+        ]
+        df = pd.DataFrame(rows)
+        edited = st.data_editor(
+            df,
+            hide_index=True,
+            width="stretch",
+            disabled=["Day", "Hebrew Date", "Schedule"],
+            key=f"progress_editor_{cycle_id}",
+        )
+        changed = edited[edited["Done"] != df["Done"]]
+        if len(changed):
+            for _, row in changed.iterrows():
+                ps.set_day_completed(user_id, cycle_id, int(row["Day"]), bool(row["Done"]), now_str)
+            st.rerun()
+
+    _dialog()
+
+
 def _render_settings(user_id, prefs, available_commentary_names, state_key, current_day, total_days):
     with st.expander("Settings & jump to day", icon="⚙️"):
         picked = st.number_input(
@@ -246,6 +276,9 @@ def render_daily_mishnah_tab():
     is_today = day.day_num == today_day_num
     now_str = datetime.datetime.now().isoformat()
 
+    if st.button("📋 Full schedule & progress"):
+        _open_progress_dialog(user_id, cycle_id, days, completed_days, now_str)
+
     # Discover which commentaries actually exist for today's reading(s), so the
     # settings dropdown never offers a commentary that isn't covered.
     commentary_names = set()
@@ -284,30 +317,3 @@ def render_daily_mishnah_tab():
     st.divider()
     pct = len(completed_days) / total_days
     st.progress(pct, text=f"{len(completed_days)} / {total_days} days completed ({pct:.0%})")
-
-    with st.expander("View full schedule & progress log"):
-        st.caption("Select a row to jump to that day's reading.")
-        rows = [
-            {
-                "Day": d.day_num,
-                "Hebrew Date": d.hebrew_date,
-                "Schedule": d.raw_schedule or ("Siyum" if d.is_siyum else "—"),
-                "Done": d.day_num in completed_days,
-            }
-            for d in days
-        ]
-        df = pd.DataFrame(rows)
-        event = st.dataframe(
-            df,
-            hide_index=True,
-            width="stretch",
-            on_select="rerun",
-            selection_mode="single-row",
-            key=f"progress_log_{cycle_id}",
-        )
-        selected_rows = event["selection"]["rows"] if event else []
-        if selected_rows:
-            selected_day_num = int(df.iloc[selected_rows[0]]["Day"])
-            if selected_day_num != st.session_state[state_key]:
-                st.session_state[state_key] = selected_day_num
-                st.rerun()
