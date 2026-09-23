@@ -195,22 +195,27 @@ def render_daily_mishnah_tab():
     def _clamp(day_num):
         return max(1, min(total_days, day_num))
 
-    nav_cols = st.columns([1, 1, 2, 1])
-    if nav_cols[0].button("Prev", width="stretch"):
+    on_today = st.session_state[state_key] == today_day_num
+    nav_cols = st.columns(4 if not on_today else 3)
+    if nav_cols[0].button("◀ Prev"):
         st.session_state[state_key] = _clamp(st.session_state[state_key] - 1)
-    if nav_cols[1].button("Today", width="stretch"):
-        st.session_state[state_key] = today_day_num
-    picked = nav_cols[2].number_input(
-        "Jump to day #",
-        min_value=1,
-        max_value=total_days,
-        value=st.session_state[state_key],
-        label_visibility="collapsed",
-    )
-    if int(picked) != st.session_state[state_key]:
-        st.session_state[state_key] = int(picked)
-    if nav_cols[3].button("Next", width="stretch"):
+    if nav_cols[1].button("Next ▶"):
         st.session_state[state_key] = _clamp(st.session_state[state_key] + 1)
+    next_col = 2
+    if not on_today:
+        if nav_cols[2].button("Today"):
+            st.session_state[state_key] = today_day_num
+        next_col = 3
+    with nav_cols[next_col].popover("Jump to day"):
+        picked = st.number_input(
+            "Day #",
+            min_value=1,
+            max_value=total_days,
+            value=st.session_state[state_key],
+        )
+        if int(picked) != st.session_state[state_key]:
+            st.session_state[state_key] = int(picked)
+            st.rerun()
 
     day = days_by_num[st.session_state[state_key]]
     is_today = day.day_num == today_day_num
