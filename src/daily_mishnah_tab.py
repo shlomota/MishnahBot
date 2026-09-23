@@ -152,15 +152,30 @@ def _render_reading(reading, language_mode, commentary_choice, now_str):
     st.link_button("Open on Sefaria ↗", reading.sefaria_url, width="stretch")
 
 
-def _open_progress_dialog(user_id, cycle_id, days, completed_days, now_str):
+def _open_progress_dialog(user_id, cycle_id, days, completed_days, now_str, state_key):
     day_nums_by_tractate = {}
     for d in days:
         for r in d.readings:
             day_nums_by_tractate.setdefault(r.tractate, set()).add(d.day_num)
     tractates = list(day_nums_by_tractate)  # chronological, by first appearance
 
+    jump_placeholder = "— pick a day —"
+    day_num_by_label = {}
+    for d in days:
+        content = d.raw_schedule or ("Siyum" if d.is_siyum else "No reading")
+        day_num_by_label[f"Day {d.day_num} · {d.hebrew_date} · {content}"] = d.day_num
+
     @st.dialog("Full schedule & progress", width="large")
     def _dialog():
+        jump_choice = st.selectbox(
+            "Jump to a day's text (type to search by tractate)",
+            [jump_placeholder] + list(day_num_by_label),
+            key=f"jump_select_{cycle_id}",
+        )
+        if jump_choice != jump_placeholder:
+            st.session_state[state_key] = day_num_by_label[jump_choice]
+            st.rerun()
+
         mark_col, btn_col = st.columns([2, 1])
         chosen_tractate = mark_col.selectbox(
             "Mark a whole tractate as done", tractates, key=f"mark_tractate_{cycle_id}"
@@ -292,7 +307,7 @@ def render_daily_mishnah_tab():
     now_str = datetime.datetime.now().isoformat()
 
     if st.button("📋 Full schedule & progress"):
-        _open_progress_dialog(user_id, cycle_id, days, completed_days, now_str)
+        _open_progress_dialog(user_id, cycle_id, days, completed_days, now_str, state_key)
 
     # Discover which commentaries actually exist for today's reading(s), so the
     # settings dropdown never offers a commentary that isn't covered.
