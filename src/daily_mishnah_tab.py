@@ -153,9 +153,24 @@ def _render_reading(reading, language_mode, commentary_choice, now_str):
 
 
 def _open_progress_dialog(user_id, cycle_id, days, completed_days, now_str):
+    day_nums_by_tractate = {}
+    for d in days:
+        for r in d.readings:
+            day_nums_by_tractate.setdefault(r.tractate, set()).add(d.day_num)
+    tractates = list(day_nums_by_tractate)  # chronological, by first appearance
+
     @st.dialog("Full schedule & progress", width="large")
     def _dialog():
-        st.caption("Check off any day directly here — changes save immediately.")
+        mark_col, btn_col = st.columns([2, 1])
+        chosen_tractate = mark_col.selectbox(
+            "Mark a whole tractate as done", tractates, key=f"mark_tractate_{cycle_id}"
+        )
+        if btn_col.button("Mark all", key=f"mark_tractate_btn_{cycle_id}"):
+            for day_num in day_nums_by_tractate[chosen_tractate]:
+                ps.set_day_completed(user_id, cycle_id, day_num, True, now_str)
+            st.rerun()
+
+        st.caption("Or check off any day directly here — changes save immediately.")
         rows = [
             {
                 "Day": d.day_num,
