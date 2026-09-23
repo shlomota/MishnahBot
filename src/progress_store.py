@@ -1,4 +1,5 @@
 """Per-user (cookie-identified, no login) progress tracking for the daily Mishnah calendar."""
+import datetime
 import os
 import sqlite3
 import uuid
@@ -9,6 +10,7 @@ import streamlit as st
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mishnah_progress.db")
 COOKIE_NAME = "mishnah_user_id"
+COOKIE_LIFETIME = datetime.timedelta(days=3650)
 
 
 @contextmanager
@@ -33,9 +35,24 @@ def _connect():
 
 
 def get_user_id():
-    """Return a stable anonymous ID for this browser, persisted via a cookie."""
+    """Return a stable anonymous ID for this browser, persisted via a cookie.
+
+    The cookie-manager component returns a placeholder empty dict on the very
+    first script run of a session (before its frontend has reported the
+    browser's real cookies back over the websocket) - acting on that as "no
+    cookie exists" would silently mint a fresh id on every page load/refresh,
+    orphaning previously-saved progress. So on that first empty read we stop
+    and let Streamlit's automatic rerun (triggered once the component's real
+    value arrives) supply the truth before we decide anything.
+    """
     cookie_manager = stx.CookieManager(key="mishnah_cookie_manager")
-    existing = cookie_manager.get(COOKIE_NAME)
+    cookies = cookie_manager.cookies
+
+    if not cookies and not st.session_state.get("_cookie_manager_ready"):
+        st.session_state["_cookie_manager_ready"] = True
+        st.stop()
+
+    existing = cookies.get(COOKIE_NAME)
     if existing:
         return existing
 
@@ -45,6 +62,7 @@ def get_user_id():
         COOKIE_NAME,
         st.session_state.pending_user_id,
         key="set_mishnah_user_id",
+        expires_at=datetime.datetime.now() + COOKIE_LIFETIME,
     )
     return st.session_state.pending_user_id
 

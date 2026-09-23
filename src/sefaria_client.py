@@ -62,7 +62,12 @@ def _get_json(path, now_str):
 
 
 def fetch_text(ref, now_str):
-    """Return {'he': [...], 'text': [...]} segment lists for a ref, cached forever.
+    """Return {'he': [...], 'text': [...], 'heTitle': str} for a ref, cached forever.
+
+    'he'/'text' are returned exactly as Sefaria nests them (a flat per-mishnah
+    list for a single chapter, a list-of-chapters-of-mishnayot for a chapter
+    range) - callers that need to know which mishnah is which should use that
+    structure directly rather than a pre-flattened one.
 
     Returns None if the ref can't be fetched (network error, doesn't exist, etc).
     """
@@ -72,14 +77,19 @@ def fetch_text(ref, now_str):
         return None
     if data.get("error"):
         return None
-    he = data.get("he") or []
-    text = data.get("text") or []
-    # Flatten one level if this is a multi-section (chapter-range) response.
-    if he and isinstance(he[0], list):
-        he = [seg for chapter in he for seg in chapter]
-    if text and isinstance(text[0], list):
-        text = [seg for chapter in text for seg in chapter]
-    return {"he": he, "text": text}
+    return {
+        "he": data.get("he") or [],
+        "text": data.get("text") or [],
+        "heTitle": data.get("heTitle") or "",
+    }
+
+
+def hebrew_tractate_name(he_title):
+    """Strip Sefaria's 'משנה '/'משניות ' prefix, leaving the bare tractate name."""
+    for prefix in ("משניות ", "משנה "):
+        if he_title.startswith(prefix):
+            return he_title[len(prefix):]
+    return he_title
 
 
 def available_commentaries(ref, now_str):
