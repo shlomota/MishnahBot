@@ -75,6 +75,12 @@ def get_completed_days(user_id, cycle):
     return {row[0] for row in rows}
 
 
+def get_all_completed(user_id):
+    """Return [(cycle, day_num), ...] for every day this identity has marked done."""
+    with _connect() as conn:
+        return conn.execute("SELECT cycle, day_num FROM progress WHERE user_id = ?", (user_id,)).fetchall()
+
+
 def set_day_completed(user_id, cycle, day_num, completed, now_str):
     with _connect() as conn:
         if completed:

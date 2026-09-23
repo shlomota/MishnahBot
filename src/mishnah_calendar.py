@@ -239,3 +239,30 @@ def calendar_for_date(gregorian_date):
     variant_name, days = variant_for_hebrew_year(hebrew_year)
     by_hebrew_date = {d.hebrew_date: d for d in days}
     return str(hebrew_year), variant_name, days, by_hebrew_date.get(hebrew_date_str)
+
+
+def _month_name_to_num(hebrew_year):
+    """This calendar's month names -> pyluach month numbers for a given Hebrew year.
+
+    Built by probing every valid month number for the year rather than
+    hardcoding a numbering scheme, since that shifts between leap and
+    non-leap years (an extra Adar).
+    """
+    mapping = {}
+    for month_num in range(1, 14):
+        try:
+            hd = dates.HebrewDate(hebrew_year, month_num, 1)
+        except ValueError:
+            continue
+        raw_name = hd.month_name(hebrew=False)
+        mapping[MONTH_NAME_MAP.get(raw_name, raw_name)] = month_num
+    return mapping
+
+
+def gregorian_date_for(hebrew_year, hebrew_date_str):
+    """Convert this calendar's 'D Month' string (for a given Hebrew year) to a datetime.date."""
+    day_str, month_name = hebrew_date_str.split(" ", 1)
+    month_num = _month_name_to_num(hebrew_year).get(month_name)
+    if month_num is None:
+        return None
+    return dates.HebrewDate(hebrew_year, month_num, int(day_str)).to_pydate()

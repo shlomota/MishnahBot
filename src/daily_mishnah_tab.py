@@ -2,12 +2,12 @@
 import datetime
 from zoneinfo import ZoneInfo
 
-import pandas as pd
 import streamlit as st
 
 import mishnah_calendar as mc
 import progress_store as ps
 import sefaria_client as sc
+import user_links as ul
 import user_prefs as up
 
 # The Hebrew day used for "today" is computed in this timezone rather than the
@@ -152,78 +152,91 @@ def _render_reading(reading, language_mode, commentary_choice, now_str):
     st.link_button("Open on Sefaria ↗", reading.sefaria_url, width="stretch")
 
 
-def _open_progress_dialog(user_id, cycle_id, days, completed_days, now_str, state_key):
+def _toggle_day_done(effective_id, cycle_id, day_num, currently_done):
+    # An on_click callback rather than a plain "if button: ...st.rerun()":
+    # an explicit st.rerun() from inside a dialog closes it, but a widget's
+    # own natural rerun (which a callback still goes through) leaves it
+    # open - confirmed empirically - so repeatedly marking days here doesn't
+    # kick you out of the list after every tap.
+    ps.set_day_completed(effective_id, cycle_id, day_num, not currently_done, datetime.datetime.now().isoformat())
+
+
+def _mark_tractate_done(effective_id, cycle_id, day_nums):
+    now_str = datetime.datetime.now().isoformat()
+    for day_num in day_nums:
+        ps.set_day_completed(effective_id, cycle_id, day_num, True, now_str)
+
+
+def _open_progress_dialog(effective_id, cycle_id, days, state_key, current_day_num, today_day_num):
     day_nums_by_tractate = {}
     for d in days:
         for r in d.readings:
             day_nums_by_tractate.setdefault(r.tractate, set()).add(d.day_num)
     tractates = list(day_nums_by_tractate)  # chronological, by first appearance
-
-    jump_placeholder = "— pick a day —"
-    day_num_by_label = {}
-    for d in days:
-        content = d.raw_schedule or ("Siyum" if d.is_siyum else "No reading")
-        day_num_by_label[f"Day {d.day_num} · {d.hebrew_date} · {content}"] = d.day_num
+    total_days = len(days)
+    window_key = f"cal_window_{cycle_id}"
+    st.session_state[window_key] = [max(1, current_day_num - 10), min(total_days, current_day_num + 10)]
+    hebrew_year = int(cycle_id)
 
     @st.dialog("Full schedule & progress", width="large")
     def _dialog():
-        jump_choice = st.selectbox(
-            "Jump to a day's text (type to search by tractate)",
-            [jump_placeholder] + list(day_num_by_label),
-            key=f"jump_select_{cycle_id}",
-        )
-        if jump_choice != jump_placeholder:
-            st.session_state[state_key] = day_num_by_label[jump_choice]
-            st.rerun()
+        completed_days = ps.get_completed_days(effective_id, cycle_id)
+        pct = len(completed_days) / total_days
+        st.progress(pct, text=f"{len(completed_days)} / {total_days} days completed ({pct:.0%})")
 
         mark_col, btn_col = st.columns([2, 1])
         chosen_tractate = mark_col.selectbox(
             "Mark a whole tractate as done", tractates, key=f"mark_tractate_{cycle_id}"
         )
-        if btn_col.button("Mark all", key=f"mark_tractate_btn_{cycle_id}"):
-            for day_num in day_nums_by_tractate[chosen_tractate]:
-                ps.set_day_completed(user_id, cycle_id, day_num, True, now_str)
-            st.rerun()
-
-        st.caption("Or check off any day directly here — changes save immediately.")
-        rows = [
-            {
-                "Day": d.day_num,
-                "Hebrew Date": d.hebrew_date,
-                "Schedule": d.raw_schedule or ("Siyum" if d.is_siyum else "—"),
-                "Done": d.day_num in completed_days,
-            }
-            for d in days
-        ]
-        df = pd.DataFrame(rows)
-        edited = st.data_editor(
-            df,
-            hide_index=True,
-            width="stretch",
-            disabled=["Day", "Hebrew Date", "Schedule"],
-            key=f"progress_editor_{cycle_id}",
+        btn_col.button(
+            "Mark all",
+            key=f"mark_tractate_btn_{cycle_id}",
+            on_click=_mark_tractate_done,
+            args=(effective_id, cycle_id, day_nums_by_tractate[chosen_tractate]),
         )
-        changed = edited[edited["Done"] != df["Done"]]
-        if len(changed):
-            for _, row in changed.iterrows():
-                ps.set_day_completed(user_id, cycle_id, int(row["Day"]), bool(row["Done"]), now_str)
-            st.rerun()
+
+        st.caption("Scroll and tap a day to jump to its text, or tap the checkmark to mark it done.")
+        w_start, w_end = st.session_state[window_key]
+        exp_col1, exp_col2 = st.columns(2)
+        if w_start > 1:
+            if exp_col1.button("⬆️ Earlier days", key=f"cal_earlier_{cycle_id}", width="stretch"):
+                st.session_state[window_key][0] = max(1, w_start - 20)
+                st.rerun()
+        if w_end < total_days:
+            if exp_col2.button("⬇️ Later days", key=f"cal_later_{cycle_id}", width="stretch"):
+                st.session_state[window_key][1] = min(total_days, w_end + 20)
+                st.rerun()
+
+        with st.container(height=450):
+            for d in days[w_start - 1 : w_end]:
+                row_done, row_go = st.columns([1, 6])
+                is_done = d.day_num in completed_days
+                row_done.button(
+                    "✅" if is_done else "⬜",
+                    key=f"cal_toggle_{cycle_id}_{d.day_num}",
+                    on_click=_toggle_day_done,
+                    args=(effective_id, cycle_id, d.day_num, is_done),
+                )
+                content = d.raw_schedule or ("Siyum" if d.is_siyum else "No reading")
+                greg = mc.gregorian_date_for(hebrew_year, d.hebrew_date)
+                greg_str = greg.strftime("%b %d") if greg else ""
+                today_marker = "📍 " if d.day_num == today_day_num else ""
+                label = f"{today_marker}{d.hebrew_date} · {greg_str} · {content}"
+                is_current = d.day_num == current_day_num
+                if row_go.button(
+                    label,
+                    key=f"cal_goto_{cycle_id}_{d.day_num}",
+                    width="stretch",
+                    type="primary" if is_current else "secondary",
+                ):
+                    st.session_state[state_key] = d.day_num
+                    st.rerun()
 
     _dialog()
 
 
-def _render_settings(user_id, prefs, available_commentary_names, state_key, current_day, total_days):
-    with st.expander("Settings & jump to day", icon="⚙️"):
-        picked = st.number_input(
-            "Jump to day #",
-            min_value=1,
-            max_value=total_days,
-            value=current_day,
-        )
-        if int(picked) != current_day:
-            st.session_state[state_key] = int(picked)
-            st.rerun()
-
+def _render_settings(cookie_user_id, effective_id, prefs, available_commentary_names):
+    with st.expander("Settings", icon="⚙️"):
         language_mode = st.radio(
             "Language",
             up.LANGUAGE_MODES,
@@ -246,8 +259,25 @@ def _render_settings(user_id, prefs, available_commentary_names, state_key, curr
             key="pref_font_size",
         )
         if (language_mode, commentary, font_size) != (prefs["language_mode"], prefs["commentary"], prefs["font_size"]):
-            up.set_prefs(user_id, language_mode, commentary, font_size)
+            up.set_prefs(effective_id, language_mode, commentary, font_size)
             st.rerun()
+
+        st.divider()
+        linked_email = ul.get_linked_email(cookie_user_id)
+        if linked_email:
+            st.caption(f"🔗 Synced as **{linked_email}** — enter it on other devices to share progress there too.")
+            if st.button("Unlink this browser", key="unlink_email_btn"):
+                ul.unlink(cookie_user_id)
+                st.rerun()
+        else:
+            st.caption("Sync progress across devices (optional): enter the same email on each one.")
+            email_input = st.text_input("Email", key="link_email_input", placeholder="you@example.com")
+            if st.button("Sync this browser", key="link_email_btn"):
+                if ul.is_valid_email(email_input):
+                    ul.link_email(cookie_user_id, email_input)
+                    st.rerun()
+                else:
+                    st.error("Enter a valid email address.")
     return language_mode, commentary, font_size
 
 
@@ -256,13 +286,15 @@ def render_daily_mishnah_tab():
     # beat to report the browser's real cookies, we stop cleanly here rather
     # than mid-render (see progress_store.get_user_id).
     user_id = ps.get_user_id()
+    effective_id = ul.effective_id(user_id)  # the linked email, once synced; else this browser's own id
 
-    prefs = up.get_prefs(user_id)
+    prefs = up.get_prefs(effective_id)
     st.markdown(_text_css(up.FONT_SIZE_REM[prefs["font_size"]]), unsafe_allow_html=True)
     st.title("Daily Mishnah")
     st.caption(
         "Following R. Ethan Tucker's Hebrew-year-aligned calendar to finish all of Shishah Sedarim in one year. "
-        "Your progress and preferences are tracked for this browser only — no login needed."
+        "Texts are retrieved from [Sefaria](https://www.sefaria.org). "
+        "Optionally sync your progress across devices with an email in Settings."
     )
 
     today = datetime.datetime.now(APP_TIMEZONE).date()
@@ -271,7 +303,7 @@ def render_daily_mishnah_tab():
     total_days = len(days)
     today_day_num = today_day.day_num if today_day else 1
 
-    completed_days = ps.get_completed_days(user_id, cycle_id)
+    completed_days = ps.get_completed_days(effective_id, cycle_id)
 
     state_key = f"daily_mishnah_day_{cycle_id}"
     if state_key not in st.session_state:
@@ -307,7 +339,7 @@ def render_daily_mishnah_tab():
     now_str = datetime.datetime.now().isoformat()
 
     if st.button("📋 Full schedule & progress"):
-        _open_progress_dialog(user_id, cycle_id, days, completed_days, now_str, state_key)
+        _open_progress_dialog(effective_id, cycle_id, days, state_key, day.day_num, today_day_num)
 
     # Discover which commentaries actually exist for today's reading(s), so the
     # settings dropdown never offers a commentary that isn't covered.
@@ -316,10 +348,12 @@ def render_daily_mishnah_tab():
         for name, _index_title in sc.available_commentaries(reading.sefaria_ref, now_str):
             commentary_names.add(name)
     language_mode, commentary, _font_size = _render_settings(
-        user_id, prefs, sorted(commentary_names), state_key, st.session_state[state_key], total_days
+        user_id, effective_id, prefs, sorted(commentary_names)
     )
 
-    header = f"Day {day.day_num} of {total_days} — {day.hebrew_date} ({cycle_id})"
+    greg_date = mc.gregorian_date_for(int(cycle_id), day.hebrew_date)
+    greg_str = f" · {greg_date.strftime('%B %d, %Y')}" if greg_date else ""
+    header = f"{day.hebrew_date} ({cycle_id}){greg_str}"
     st.subheader(header + " · today" if is_today else header)
     if day.parsha:
         st.caption(day.parsha)
@@ -341,7 +375,7 @@ def render_daily_mishnah_tab():
     # target is only ~13px, well under a usable mobile touch target.
     btn_label = "✅ Learned — tap to unmark" if done else "☐ Mark this day as learned"
     if st.button(btn_label, width="stretch", type="secondary" if done else "primary"):
-        ps.set_day_completed(user_id, cycle_id, day.day_num, not done, now_str)
+        ps.set_day_completed(effective_id, cycle_id, day.day_num, not done, now_str)
         st.rerun()
 
     st.divider()
