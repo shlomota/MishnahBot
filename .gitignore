@@ -3,3 +3,6 @@ __pycache__/
 
 # Ignore .pyc files
 *.pyc
+
+# Per-user Daily Mishnah progress (local runtime state, not source)
+src/mishnah_progress.db

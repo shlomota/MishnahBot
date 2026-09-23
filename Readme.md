@@ -6,6 +6,7 @@ This project demonstrates the creation of a Retrieval-Augmented Generation (RAG)
 
 ## Recent Updates
 
+- **Daily Mishnah tab (2026):** A `/daily` page tracking R. Ethan Tucker's Hebrew-year-aligned Mishnah learning calendar (all of Shishah Sedarim in one year). Shows today's chapters with the matching Sefaria text embedded, lets you browse any day in the cycle, and tracks per-browser progress (via an anonymous cookie, no login) in a local SQLite file.
 - **LLM Reranking (2026):** Retrieves top 20 candidate passages from ChromaDB and uses the LLM in a single call to both answer the question and identify which sources were actually used. Cited sources are displayed separately from related-but-not-cited sources.
 - **Related Sources Section (2026):** After each answer, a collapsible "Related Sources" section shows topically relevant passages that weren't directly cited in the answer.
 - **Upgraded to Claude Sonnet 4.5 (2026):** Migrated from the legacy Claude 3 Sonnet model to `claude-sonnet-4-5` via AWS Bedrock cross-region inference profiles.

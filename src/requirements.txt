@@ -4,3 +4,6 @@ chromadb
 sentence-transformers
 python-bidi
 streamlit
+pyluach
+extra-streamlit-components
+pandas
