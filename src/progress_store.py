@@ -19,9 +19,10 @@ def _connect():
             """
             CREATE TABLE IF NOT EXISTS progress (
                 user_id TEXT NOT NULL,
+                cycle TEXT NOT NULL,
                 day_num INTEGER NOT NULL,
                 completed_at TEXT NOT NULL,
-                PRIMARY KEY (user_id, day_num)
+                PRIMARY KEY (user_id, cycle, day_num)
             )
             """
         )
@@ -48,27 +49,27 @@ def get_user_id():
     return st.session_state.pending_user_id
 
 
-def get_completed_days(user_id):
+def get_completed_days(user_id, cycle):
     with _connect() as conn:
         rows = conn.execute(
-            "SELECT day_num FROM progress WHERE user_id = ?", (user_id,)
+            "SELECT day_num FROM progress WHERE user_id = ? AND cycle = ?", (user_id, cycle)
         ).fetchall()
     return {row[0] for row in rows}
 
 
-def set_day_completed(user_id, day_num, completed, now_str):
+def set_day_completed(user_id, cycle, day_num, completed, now_str):
     with _connect() as conn:
         if completed:
             conn.execute(
                 """
-                INSERT INTO progress (user_id, day_num, completed_at)
-                VALUES (?, ?, ?)
-                ON CONFLICT(user_id, day_num) DO NOTHING
+                INSERT INTO progress (user_id, cycle, day_num, completed_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(user_id, cycle, day_num) DO NOTHING
                 """,
-                (user_id, day_num, now_str),
+                (user_id, cycle, day_num, now_str),
             )
         else:
             conn.execute(
-                "DELETE FROM progress WHERE user_id = ? AND day_num = ?",
-                (user_id, day_num),
+                "DELETE FROM progress WHERE user_id = ? AND cycle = ? AND day_num = ?",
+                (user_id, cycle, day_num),
             )

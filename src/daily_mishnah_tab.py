@@ -15,10 +15,6 @@ import progress_store as ps
 APP_TIMEZONE = ZoneInfo("America/New_York")
 
 
-def _clamp(day_num):
-    return max(1, min(mc.TOTAL_DAYS, day_num))
-
-
 def render_daily_mishnah_tab():
     st.title("Daily Mishnah")
     st.caption(
@@ -26,38 +22,44 @@ def render_daily_mishnah_tab():
         "Your progress is tracked for this browser only — no login needed."
     )
 
-    user_id = ps.get_user_id()
-    completed_days = ps.get_completed_days(user_id)
-
     today = datetime.datetime.now(APP_TIMEZONE).date()
-    today_calendar_day = mc.day_for_date(today)
-    today_day_num = today_calendar_day.day_num if today_calendar_day else 1
+    cycle_id, variant_name, days, today_day = mc.calendar_for_date(today)
+    days_by_num = {d.day_num: d for d in days}
+    total_days = len(days)
+    today_day_num = today_day.day_num if today_day else 1
 
-    if "daily_mishnah_day" not in st.session_state:
-        st.session_state.daily_mishnah_day = today_day_num
+    user_id = ps.get_user_id()
+    completed_days = ps.get_completed_days(user_id, cycle_id)
+
+    state_key = f"daily_mishnah_day_{cycle_id}"
+    if state_key not in st.session_state:
+        st.session_state[state_key] = today_day_num
+
+    def _clamp(day_num):
+        return max(1, min(total_days, day_num))
 
     nav_cols = st.columns([1, 1, 2, 1])
     if nav_cols[0].button("Prev", width="stretch"):
-        st.session_state.daily_mishnah_day = _clamp(st.session_state.daily_mishnah_day - 1)
+        st.session_state[state_key] = _clamp(st.session_state[state_key] - 1)
     if nav_cols[1].button("Today", width="stretch"):
-        st.session_state.daily_mishnah_day = today_day_num
+        st.session_state[state_key] = today_day_num
     picked = nav_cols[2].number_input(
         "Jump to day #",
         min_value=1,
-        max_value=mc.TOTAL_DAYS,
-        value=st.session_state.daily_mishnah_day,
+        max_value=total_days,
+        value=st.session_state[state_key],
         label_visibility="collapsed",
     )
-    if int(picked) != st.session_state.daily_mishnah_day:
-        st.session_state.daily_mishnah_day = int(picked)
+    if int(picked) != st.session_state[state_key]:
+        st.session_state[state_key] = int(picked)
     if nav_cols[3].button("Next", width="stretch"):
-        st.session_state.daily_mishnah_day = _clamp(st.session_state.daily_mishnah_day + 1)
+        st.session_state[state_key] = _clamp(st.session_state[state_key] + 1)
 
-    day = mc.get_day(st.session_state.daily_mishnah_day)
+    day = days_by_num[st.session_state[state_key]]
     is_today = day.day_num == today_day_num
 
-    header = f"Day {day.day_num} of {mc.TOTAL_DAYS} — {day.hebrew_date}"
-    st.subheader(header + " (today)" if is_today else header)
+    header = f"Day {day.day_num} of {total_days} — {day.hebrew_date} ({cycle_id})"
+    st.subheader(header + " · today" if is_today else header)
     if day.parsha:
         st.caption(day.parsha)
 
@@ -71,7 +73,7 @@ def render_daily_mishnah_tab():
                 st.markdown(f"#### {reading.label}")
                 link_col, toggle_col = st.columns(2)
                 link_col.link_button("Open on Sefaria ↗", reading.sefaria_url, width="stretch")
-                show_key = f"show_inline_{day.day_num}_{reading.sefaria_ref}"
+                show_key = f"show_inline_{cycle_id}_{day.day_num}_{reading.sefaria_ref}"
                 if toggle_col.toggle("Show text here", key=show_key):
                     components.iframe(reading.sefaria_url, height=700, scrolling=True)
 
@@ -79,14 +81,14 @@ def render_daily_mishnah_tab():
         st.success(f"Completes: {day.completes}")
 
     done = day.day_num in completed_days
-    new_done = st.checkbox("Mark this day as learned", value=done, key=f"done_{day.day_num}")
+    new_done = st.checkbox("Mark this day as learned", value=done, key=f"done_{cycle_id}_{day.day_num}")
     if new_done != done:
-        ps.set_day_completed(user_id, day.day_num, new_done, datetime.datetime.now().isoformat())
+        ps.set_day_completed(user_id, cycle_id, day.day_num, new_done, datetime.datetime.now().isoformat())
         st.rerun()
 
     st.divider()
-    pct = len(completed_days) / mc.TOTAL_DAYS
-    st.progress(pct, text=f"{len(completed_days)} / {mc.TOTAL_DAYS} days completed ({pct:.0%})")
+    pct = len(completed_days) / total_days
+    st.progress(pct, text=f"{len(completed_days)} / {total_days} days completed ({pct:.0%})")
 
     with st.expander("View full schedule & progress log"):
         rows = [
@@ -96,7 +98,7 @@ def render_daily_mishnah_tab():
                 "Schedule": d.raw_schedule or ("Siyum" if d.is_siyum else "—"),
                 "Done": d.day_num in completed_days,
             }
-            for d in mc.CALENDAR_DAYS
+            for d in days
         ]
         df = pd.DataFrame(rows)
         edited = st.data_editor(
@@ -104,11 +106,11 @@ def render_daily_mishnah_tab():
             hide_index=True,
             width="stretch",
             disabled=["Day", "Hebrew Date", "Schedule"],
-            key="progress_editor",
+            key=f"progress_editor_{cycle_id}",
         )
         changed = edited[edited["Done"] != df["Done"]]
         if len(changed):
             now_str = datetime.datetime.now().isoformat()
             for _, row in changed.iterrows():
-                ps.set_day_completed(user_id, int(row["Day"]), bool(row["Done"]), now_str)
+                ps.set_day_completed(user_id, cycle_id, int(row["Day"]), bool(row["Done"]), now_str)
             st.rerun()

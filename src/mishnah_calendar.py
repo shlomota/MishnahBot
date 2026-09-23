@@ -1,31 +1,37 @@
 """Daily Mishnah calendar: maps Hebrew dates to today's chapters and Sefaria refs.
 
 Calendar data is a static snapshot of R. Ethan Tucker's Hebrew-year-aligned
-Mishnah learning schedule (Hebrew year 5786), stored in mishnah_calendar.csv.
-Days are matched by Hebrew month/day (ignoring year) so the same 354-day cycle
-can be looked up regardless of which Gregorian/Hebrew year it's currently rendered in.
+Mishnah learning schedule. A Hebrew year's shape is fully determined by two
+facts: the weekday its 1 Tishrei falls on, and its length in days (353-355 for
+a regular year, 383-385 for a leap year). There are exactly 14 valid
+combinations ("keviah" patterns), and the source spreadsheet has one tab per
+pattern (named things like "7F5"), each a complete day-by-day schedule for any
+Hebrew year matching that pattern. We pick the matching tab for whichever
+Hebrew year is relevant and look up within it by Hebrew month/day - so the
+calendar stays correct across Hebrew years without any manual updates.
 """
 import csv
+import glob
 import os
 import re
 from dataclasses import dataclass, field
 
 from pyluach import dates
 
-CSV_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mishnah_calendar.csv")
+VARIANTS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "mishnah_calendar_variants")
 
 # pyluach's month names -> this calendar's month names
 MONTH_NAME_MAP = {
     "Nissan": "Nisan",
     "Teves": "Tevet",
     "Cheshvan": "Marheshvan",
-    "Adar 1": "Adar",
-    "Adar 2": "Adar",
+    "Adar 1": "Adar I",
+    "Adar 2": "Adar II",
     "Adar": "Adar",
 }
 
 # CSV tractate name -> canonical Sefaria title (spellings differ between the
-# calendar source and Sefaria's indexing).
+# calendar source and Sefaria's indexing, and even between variant tabs).
 TRACTATE_TO_SEFARIA = {
     "Aholot": "Mishnah Oholot",
     "Arakhin": "Mishnah Arakhin",
@@ -57,6 +63,7 @@ TRACTATE_TO_SEFARIA = {
     "Makkot": "Mishnah Makkot",
     "Makshirin": "Mishnah Makhshirin",
     "Me'ilah": "Mishnah Meilah",
+    "Meilah": "Mishnah Meilah",
     "Megillah": "Mishnah Megillah",
     "Menahot": "Mishnah Menachot",
     "Middot": "Mishnah Middot",
@@ -160,22 +167,23 @@ def _parse_schedule(raw_schedule):
     return readings, False
 
 
-def _load_calendar():
+def _load_variant(csv_path):
     days = []
-    with open(CSV_PATH, newline="", encoding="utf-8") as f:
+    with open(csv_path, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
-            day_num = row.get("Day #", "").strip()
+            day_num = (row.get("Day #") or "").strip()
             if not day_num.isdigit():
                 continue
             readings, is_siyum = _parse_schedule(row.get("Schedule", ""))
+            parsha = (row.get("Parsha") or "").replace("\n", " / ").strip()
             days.append(
                 CalendarDay(
                     day_num=int(day_num),
-                    hebrew_date=row.get("Hebrew Date", "").strip(),
-                    weekday=row.get("Weekday", "").strip(),
+                    hebrew_date=(row.get("Hebrew Date") or "").strip(),
+                    weekday=(row.get("Weekday") or "").strip(),
                     raw_schedule=(row.get("Schedule") or "").strip(),
-                    parsha=(row.get("Parsha (Diaspora 5786)") or "").strip(),
-                    completes=(row.get("Massekhot to Be Completed by this date") or "").strip(),
+                    parsha=parsha,
+                    completes=(row.get("Completes") or "").strip(),
                     readings=readings,
                     is_siyum=is_siyum,
                 )
@@ -183,10 +191,38 @@ def _load_calendar():
     return days
 
 
-CALENDAR_DAYS = _load_calendar()
-TOTAL_DAYS = len(CALENDAR_DAYS)
-_BY_HEBREW_DATE = {d.hebrew_date: d for d in CALENDAR_DAYS}
-_BY_DAY_NUM = {d.day_num: d for d in CALENDAR_DAYS}
+def _load_all_variants():
+    variants = {}
+    for path in sorted(glob.glob(os.path.join(VARIANTS_DIR, "*.csv"))):
+        name = os.path.splitext(os.path.basename(path))[0]
+        days = _load_variant(path)
+        if not days:
+            continue
+        signature = (days[0].weekday, len(days))
+        variants[name] = {"days": days, "signature": signature}
+    return variants
+
+
+_VARIANTS = _load_all_variants()
+_SIGNATURE_TO_VARIANT = {v["signature"]: name for name, v in _VARIANTS.items()}
+
+
+def _hebrew_year_signature(hebrew_year):
+    """The (weekday-of-1-Tishrei, year-length-in-days) signature for a Hebrew year."""
+    start = dates.HebrewDate(hebrew_year, 7, 1).to_pydate()  # 7 = Tishrei
+    next_start = dates.HebrewDate(hebrew_year + 1, 7, 1).to_pydate()
+    weekday = start.strftime("%A")
+    length = (next_start - start).days
+    return weekday, length
+
+
+def variant_for_hebrew_year(hebrew_year):
+    """Return (variant_name, list[CalendarDay]) for the given Hebrew year."""
+    signature = _hebrew_year_signature(hebrew_year)
+    variant_name = _SIGNATURE_TO_VARIANT.get(signature)
+    if variant_name is None:
+        raise ValueError(f"No calendar variant found for Hebrew year {hebrew_year} (signature {signature})")
+    return variant_name, _VARIANTS[variant_name]["days"]
 
 
 def hebrew_date_str_for(gregorian_date):
@@ -194,13 +230,12 @@ def hebrew_date_str_for(gregorian_date):
     heb = dates.GregorianDate(gregorian_date.year, gregorian_date.month, gregorian_date.day).to_heb()
     month_name = heb.month_name(hebrew=False)
     month_name = MONTH_NAME_MAP.get(month_name, month_name)
-    return f"{heb.day} {month_name}"
+    return heb.year, f"{heb.day} {month_name}"
 
 
-def day_for_date(gregorian_date):
-    """Return the CalendarDay matching a Gregorian date's Hebrew month/day, if any."""
-    return _BY_HEBREW_DATE.get(hebrew_date_str_for(gregorian_date))
-
-
-def get_day(day_num):
-    return _BY_DAY_NUM.get(day_num)
+def calendar_for_date(gregorian_date):
+    """Return (cycle_id, variant_name, days, day_for_this_date_or_None) for a Gregorian date."""
+    hebrew_year, hebrew_date_str = hebrew_date_str_for(gregorian_date)
+    variant_name, days = variant_for_hebrew_year(hebrew_year)
+    by_hebrew_date = {d.hebrew_date: d for d in days}
+    return str(hebrew_year), variant_name, days, by_hebrew_date.get(hebrew_date_str)
