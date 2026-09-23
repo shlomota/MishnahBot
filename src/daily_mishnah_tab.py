@@ -1,5 +1,6 @@
 """Streamlit UI for the Daily Mishnah calendar tab."""
 import datetime
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import streamlit as st
@@ -7,6 +8,11 @@ import streamlit.components.v1 as components
 
 import mishnah_calendar as mc
 import progress_store as ps
+
+# The Hebrew day used for "today" is computed in this timezone rather than the
+# server's local time, since the Jewish calendar day is a real-world calendar
+# concept tied to where learners actually are, not to server infrastructure.
+APP_TIMEZONE = ZoneInfo("America/New_York")
 
 
 def _clamp(day_num):
@@ -23,7 +29,7 @@ def render_daily_mishnah_tab():
     user_id = ps.get_user_id()
     completed_days = ps.get_completed_days(user_id)
 
-    today = datetime.date.today()
+    today = datetime.datetime.now(APP_TIMEZONE).date()
     today_calendar_day = mc.day_for_date(today)
     today_day_num = today_calendar_day.day_num if today_calendar_day else 1
 
