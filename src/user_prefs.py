@@ -8,7 +8,7 @@ DB_PATH = PROGRESS_DB_PATH  # share the same small local db as progress tracking
 
 LANGUAGE_MODES = ["Hebrew", "English", "Bilingual"]
 FONT_SIZES = ["Small", "Medium", "Large", "Extra Large"]
-FONT_SIZE_REM = {"Small": 1.0, "Medium": 1.15, "Large": 1.4, "Extra Large": 1.7}
+FONT_SIZE_REM = {"Small": 1.8, "Medium": 2.1, "Large": 2.5, "Extra Large": 3.1}
 DEFAULT_PREFS = {"language_mode": "Bilingual", "commentary": "None", "font_size": "Medium"}
 
 

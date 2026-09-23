@@ -92,6 +92,45 @@ def hebrew_tractate_name(he_title):
     return he_title
 
 
+_HEBREW_HUNDREDS = [(400, "ת"), (300, "ש"), (200, "ר"), (100, "ק")]
+_HEBREW_TENS = [(90, "צ"), (80, "פ"), (70, "ע"), (60, "ס"), (50, "נ"), (40, "מ"), (30, "ל"), (20, "כ"), (10, "י")]
+_HEBREW_ONES = [(9, "ט"), (8, "ח"), (7, "ז"), (6, "ו"), (5, "ה"), (4, "ד"), (3, "ג"), (2, "ב"), (1, "א")]
+
+
+def hebrew_numeral(n):
+    """Convert a positive integer to a Hebrew gematria numeral (e.g. 11 -> יא).
+
+    15 and 16 use the traditional טו/טז substitution rather than יה/יו, which
+    resemble forms of the divine name.
+    """
+    if n <= 0:
+        return str(n)
+    result = ""
+    remaining = n
+    for value, letter in _HEBREW_HUNDREDS:
+        while remaining >= value:
+            result += letter
+            remaining -= value
+    if remaining == 15:
+        result += "טו"
+        remaining = 0
+    elif remaining == 16:
+        result += "טז"
+        remaining = 0
+    else:
+        for value, letter in _HEBREW_TENS:
+            if remaining >= value:
+                result += letter
+                remaining -= value
+                break
+        for value, letter in _HEBREW_ONES:
+            if remaining >= value:
+                result += letter
+                remaining -= value
+                break
+    return result
+
+
 def available_commentaries(ref, now_str):
     """Return sorted list of commentator display names available for a ref."""
     try:

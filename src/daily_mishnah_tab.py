@@ -28,22 +28,22 @@ def _text_css(font_size_rem):
     margin-bottom: 0.4rem; overflow-wrap: break-word; word-break: break-word; max-width: 100%;
 }}
 .mishnah-en {{
-    direction: ltr; text-align: left; font-size: {font_size_rem * 0.82}rem; line-height: 1.7;
+    direction: ltr; text-align: left; font-size: {font_size_rem}rem; line-height: 1.7;
     margin-bottom: 0.9rem; opacity: 0.92; overflow-wrap: break-word; word-break: break-word; max-width: 100%;
 }}
 .mishnah-header {{
     direction: rtl; text-align: right; font-weight: 600; opacity: 0.6;
-    font-size: {max(font_size_rem * 0.7, 0.75)}rem; margin-top: 0.9rem;
+    font-size: {font_size_rem * 0.6}rem; margin-top: 0.9rem;
 }}
 .commentary-block {{ border-left: 3px solid rgba(128,128,128,0.35); padding-left: 0.8rem; margin: 0.3rem 0 0.7rem 0; }}
 </style>
 """
 
 
-def _render_commentary_block(commentary_choice, he, en, language_mode):
+def _render_commentary_block(label, he, en, language_mode):
     with st.container():
         st.markdown("<div class='commentary-block'>", unsafe_allow_html=True)
-        st.caption(commentary_choice)
+        st.caption(label)
         if language_mode in ("Hebrew", "Bilingual") and he:
             st.markdown(f"<div class='mishnah-he'>{he}</div>", unsafe_allow_html=True)
         if language_mode in ("English", "Bilingual") and en:
@@ -52,8 +52,17 @@ def _render_commentary_block(commentary_choice, he, en, language_mode):
 
 
 def _render_interleaved(reading, data, c_data, commentary_choice, language_mode):
-    """Render each mishnah followed immediately by its own commentary, if any."""
-    he_title = sc.hebrew_tractate_name(data.get("heTitle") or "") or reading.tractate
+    """Render each mishnah followed immediately by its own commentary, if any.
+
+    Sefaria doesn't reliably segment every commentary one-per-mishnah within a
+    multi-chapter range fetch (a commentary's own natural section count for a
+    chapter can differ from that chapter's mishnah count, and in practice the
+    non-first chapter of a range often collapses to a single combined slot).
+    So per-mishnah interleaving is only used when a chapter's commentary
+    segment count actually matches its mishnah count; otherwise that whole
+    chapter's commentary is shown as one block after its last mishnah, rather
+    than silently mis-attributing or dropping it.
+    """
     is_range = reading.chapter_end != reading.chapter_start
     he_by_chapter = data["he"] if is_range else [data["he"]]
     en_by_chapter = data["text"] if is_range else [data["text"]]
@@ -71,23 +80,34 @@ def _render_interleaved(reading, data, c_data, commentary_choice, language_mode)
         he_com_chapter = he_com_by_chapter[chapter_offset] if chapter_offset < len(he_com_by_chapter) else []
         en_com_chapter = en_com_by_chapter[chapter_offset] if chapter_offset < len(en_com_by_chapter) else []
 
-        for mishnah_offset in range(max(len(he_chapter), len(en_chapter))):
+        mishnah_count = max(len(he_chapter), len(en_chapter))
+        com_aligned = commentary_choice and commentary_choice != "None" and mishnah_count and (
+            len(he_com_chapter) == mishnah_count or len(en_com_chapter) == mishnah_count
+        )
+
+        for mishnah_offset in range(mishnah_count):
             he = he_chapter[mishnah_offset] if mishnah_offset < len(he_chapter) else ""
             en = en_chapter[mishnah_offset] if mishnah_offset < len(en_chapter) else ""
-            header = f"מסכת {he_title} פרק {chapter_num} משנה {mishnah_offset + 1}"
+            header = f"פרק {sc.hebrew_numeral(chapter_num)} משנה {sc.hebrew_numeral(mishnah_offset + 1)}"
             st.markdown(f"<div class='mishnah-header'>{header}</div>", unsafe_allow_html=True)
             if language_mode in ("Hebrew", "Bilingual") and he:
                 st.markdown(f"<div class='mishnah-he'>{he}</div>", unsafe_allow_html=True)
             if language_mode in ("English", "Bilingual") and en:
                 st.markdown(f"<div class='mishnah-en'>{en}</div>", unsafe_allow_html=True)
 
-            if commentary_choice and commentary_choice != "None":
+            if com_aligned:
                 he_com_raw = he_com_chapter[mishnah_offset] if mishnah_offset < len(he_com_chapter) else None
                 en_com_raw = en_com_chapter[mishnah_offset] if mishnah_offset < len(en_com_chapter) else None
                 he_com = "<br><br>".join(sc.flatten_to_paragraphs(he_com_raw)) if he_com_raw else ""
                 en_com = "<br><br>".join(sc.flatten_to_paragraphs(en_com_raw)) if en_com_raw else ""
                 if he_com or en_com:
                     _render_commentary_block(commentary_choice, he_com, en_com, language_mode)
+
+        if commentary_choice and commentary_choice != "None" and not com_aligned and (he_com_chapter or en_com_chapter):
+            he_com = "<br><br>".join(sc.flatten_to_paragraphs(he_com_chapter))
+            en_com = "<br><br>".join(sc.flatten_to_paragraphs(en_com_chapter))
+            if he_com or en_com:
+                _render_commentary_block(f"{commentary_choice} — chapter {chapter_num}", he_com, en_com, language_mode)
 
 
 def _render_reading(reading, language_mode, commentary_choice, now_str):
