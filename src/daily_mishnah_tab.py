@@ -46,10 +46,15 @@ def _text_css(font_size_rem):
     font-size: {font_size_rem * HEADER_RATIO}rem; margin-top: 1.1rem;
 }}
 .commentary-block {{ border-left: 3px solid rgba(128,128,128,0.35); padding-left: 0.8rem; margin: 0.3rem 0 0.7rem 0; }}
+.commentary-label {{
+    direction: ltr; text-align: left; font-weight: 700; opacity: 1;
+    font-size: {font_size_rem * HEADER_RATIO}rem; margin-top: 0.3rem;
+}}
 @media (min-width: {DESKTOP_BREAKPOINT_PX}px) {{
     .mishnah-he {{ font-size: {desktop_rem}rem; }}
     .mishnah-en {{ font-size: {desktop_rem}rem; }}
     .mishnah-header {{ font-size: {desktop_rem * HEADER_RATIO}rem; }}
+    .commentary-label {{ font-size: {desktop_rem * HEADER_RATIO}rem; }}
 }}
 </style>
 """
@@ -58,7 +63,7 @@ def _text_css(font_size_rem):
 def _render_commentary_block(label, he, en, language_mode):
     with st.container():
         st.markdown("<div class='commentary-block'>", unsafe_allow_html=True)
-        st.caption(label)
+        st.markdown(f"<div class='commentary-label'>{label}</div>", unsafe_allow_html=True)
         if language_mode in ("Hebrew", "Bilingual") and he:
             st.markdown(f"<div class='mishnah-he'>{he}</div>", unsafe_allow_html=True)
         if language_mode in ("English", "Bilingual") and en:
