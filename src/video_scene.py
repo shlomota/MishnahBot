@@ -36,7 +36,7 @@ os.makedirs(OUT_DIR, exist_ok=True)
 VIDEO_GEN_PIN = os.environ.get("VIDEO_GEN_PIN", "")
 
 BASE = "https://openrouter.ai/api/v1"
-SCENE_MODEL = "anthropic/claude-sonnet-4.5"
+SCENE_MODEL = "anthropic/claude-sonnet-5.5"
 IMAGE_MODEL = "recraft/recraft-v4.1"
 VIDEO_MODEL = "alibaba/wan-2.7"
 TTS_MODEL = "elevenlabs/eleven-v4"
@@ -54,13 +54,28 @@ Respond with ONLY a JSON object with exactly these keys:
 house style closely: flat vector illustration, modern children's-book style, warm earthy palette \
 (terracotta, cream, sage green), bold clean outlines, decorative sparkle and star accents \
 scattered around, soft warm lighting, vertical 9:16 portrait composition, minimalist uncluttered \
-background, playful whimsical mood, no text or letters anywhere in the image. Describe one \
-concrete visual moment (characters, objects, setting, action) consistent with the halakha chosen.
-- "video_prompt": a short motion prompt animating that same illustration - gentle camera movement \
-(slow zoom/pan) plus one or two small animated details, cinemagraph-style, smooth and loopable.
+background, playful whimsical mood, no text or letters anywhere in the image. Pose the character(s) \
+mid-action, caught at the most exaggerated, off-balance, comedic instant of the scene (frozen \
+mid-leap, mid-flinch, eyes bugging out, arms flailing) - like a freeze-frame from a cartoon, not a \
+calm portrait - since this still is the first frame of an animation and needs somewhere wild to go.
+- "video_prompt": a motion prompt that makes that illustration genuinely MOVE - this is the single \
+most important field. The failure mode to avoid is a slow zoom with nothing else happening. Instead \
+describe big, fast, obvious physical action: a character leaping/bolting/spinning/slamming something, \
+limbs flying, objects flung across frame, exaggerated squash-and-stretch cartoon motion, a quick \
+whip-pan or snap-zoom on the punchline beat, things rapidly shaking/wobbling/bursting. Treat it like \
+a 3-second slapstick cartoon gag on loop, not a gentle ambient cinemagraph. Avoid the words "gentle", \
+"subtle", and "slow" entirely.
 - "narration": an ORIGINAL 40-70 word narration script, in your own words. It must \
-paraphrase/summarize the halakhic content - never quote or closely copy any translation. Tone: \
-light, fun, a little silly, but accurate to the actual halakha.
+paraphrase/summarize the halakhic content - never quote or closely copy any translation. Write it \
+like a stand-up comedian's bit, not an explainer: open with an absurd, incredulous angle on the \
+situation, escalate with a ridiculous exaggeration or unexpected tangent, and land a punchy, slightly \
+unhinged button line. Channel the comedic STYLE of Monty Python - deadpan delivery, wildly over-pedantic logic applied to \
+a silly scenario, sudden non-sequiturs, mock-serious escalation, absurd bureaucratic nitpicking. \
+This means emulating that general tone and comic technique only - never quote, paraphrase-closely, \
+or reference any of their actual specific sketches, characters, or lines; write entirely new jokes \
+in that spirit, about this halakha. Be genuinely random and weird, not just "light and whimsical" - \
+surprise the listener. It still has to be accurate enough that someone could reconstruct the real \
+halakha from it.
 - "stamp": a short punchy overlay word or phrase (1-3 words, e.g. "LIABLE?" or "EXEMPT!") \
 capturing the twist or key takeaway.
 - "citation": a citation string for the specific moment chosen, e.g. "Shabbat 13:6-7".
