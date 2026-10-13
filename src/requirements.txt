@@ -8,3 +8,4 @@ pyluach
 extra-streamlit-components
 pandas
 requests
+python-dotenv

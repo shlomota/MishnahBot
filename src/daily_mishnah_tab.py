@@ -10,6 +10,7 @@ import progress_store as ps
 import sefaria_client as sc
 import user_links as ul
 import user_prefs as up
+import video_scene as vs
 
 # The Hebrew day used for "today" is computed in this timezone rather than the
 # server's local time, since the Jewish calendar day is a real-world calendar
@@ -130,6 +131,39 @@ def _render_reading(reading, language_mode, commentary_choice, now_str):
     _render_interleaved(reading, data, commentary_index_title, commentary_choice, language_mode, now_str)
 
     st.link_button("Open on Sefaria ↗", reading.sefaria_url, width="stretch")
+
+
+def _render_video_section(day, cycle_id):
+    cached_path = vs.cached_video_path(cycle_id, day.day_num)
+    with st.expander(f"🎬 AI explainer scene — {day.hebrew_date}"):
+        if cached_path:
+            st.video(cached_path)
+        elif not day.readings:
+            st.caption("No reading to illustrate for this day.")
+        elif not st.session_state.get("video_gen_unlocked"):
+            # This page has no login, and each generation spends real
+            # OpenRouter credits - a PIN is just friction against a random
+            # visitor clicking it, not meant as real security.
+            pin = st.text_input("PIN to generate a video", type="password", key=f"pin_{cycle_id}_{day.day_num}")
+            if pin:
+                if vs.VIDEO_GEN_PIN and pin == vs.VIDEO_GEN_PIN:
+                    st.session_state["video_gen_unlocked"] = True
+                    st.rerun()
+                else:
+                    st.error("Incorrect PIN.")
+        else:
+            st.caption(
+                "Generate a 30-second AI-illustrated, narrated video for this day's reading. "
+                "Takes 1-2 minutes and costs real money (about $0.60-1) - use deliberately."
+            )
+            if st.button("Generate explainer video", key=f"gen_video_{cycle_id}_{day.day_num}"):
+                with st.spinner("Generating AI explainer video (image, animation, narration) — this takes 1-2 minutes..."):
+                    try:
+                        vs.generate_video_for_day(day, cycle_id)
+                    except Exception as e:
+                        st.error(f"Video generation failed: {e}")
+                    else:
+                        st.rerun()
 
 
 def _build_tractate_index(days):
@@ -413,6 +447,8 @@ def render_daily_mishnah_tab():
     is_today = day.day_num == today_day_num
     now_str = datetime.datetime.now().isoformat()
     language_mode, commentary = prefs["language_mode"], prefs["commentary"]
+
+    _render_video_section(day, cycle_id)
 
     # Discover which commentaries actually exist for this day's reading(s), so
     # the settings dropdown never offers a commentary that isn't covered.
