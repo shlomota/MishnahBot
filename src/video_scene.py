@@ -634,14 +634,23 @@ def _run_pipeline(segments, code, citation, prefix, final_path, kind):
     return final_path
 
 
+_FINAL_VIDEO_FILENAME = re.compile(r"^(\d+_\d+|custom_[0-9a-f]+)\.mp4$")
+
+
 def list_generated_videos():
     """List every cached video (Daily Mishnah and custom-text alike) newest
     first, with an indicative title/blurb for the "explore videos" page.
     Videos generated before metadata sidecars existed still show up, just
-    with a plainer filename-derived title."""
+    with a plainer filename-derived title. Only matches final-output
+    filenames (see video_path_for/custom_video_path) - earlier pipeline
+    iterations left intermediate files (*_raw.mp4, *_beat0.mp4, etc.) in
+    this same directory that aren't real deliverables.
+    """
     videos = []
     for path in glob.glob(os.path.join(OUT_DIR, "*.mp4")):
         filename = os.path.basename(path)
+        if not _FINAL_VIDEO_FILENAME.match(filename):
+            continue
         meta_path = path + ".json"
         meta = {}
         if os.path.exists(meta_path):
