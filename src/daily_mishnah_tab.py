@@ -153,11 +153,11 @@ def _render_video_section(day, cycle_id):
                     st.error("Incorrect PIN.")
         else:
             st.caption(
-                "Generate a 30-second AI-illustrated, narrated video for this day's reading. "
-                "Takes 1-2 minutes and costs real money (about $0.60-1) - use deliberately."
+                f"Generate a {vs.DEFAULT_TARGET_SECONDS}-second AI-illustrated, narrated video for this day's reading. "
+                "Takes a few minutes and costs real money (about $2) - use deliberately."
             )
             if st.button("Generate explainer video", key=f"gen_video_{cycle_id}_{day.day_num}"):
-                with st.spinner("Generating AI explainer video (image, animation, narration) — this takes 1-2 minutes..."):
+                with st.spinner("Generating AI explainer video (images, animation, narration) — this takes a few minutes..."):
                     try:
                         vs.generate_video_for_day(day, cycle_id)
                     except Exception as e:
