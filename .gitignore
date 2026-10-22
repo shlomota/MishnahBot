@@ -6,3 +6,7 @@ __pycache__/
 
 # Per-user Daily Mishnah progress (local runtime state, not source)
 src/mishnah_progress.db
+src/sefaria_cache.db
+
+# macOS
+.DS_Store
