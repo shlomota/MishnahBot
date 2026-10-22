@@ -214,38 +214,76 @@ def collect_readings_text(day, now_str):
     return "\n\n".join(blocks)
 
 
-def _normalize_sefaria_ref(raw):
-    """Turn a casually-typed reference ("Shabbat 2:3", "Pirkei Avot 1") into a
-    Sefaria ref string ("Shabbat.2.3"). Refs that already look fully-formed
-    (contain a '.') pass through almost as-is."""
-    ref = raw.strip().replace(":", ".")
-    if not ref:
-        return None
-    match = re.match(r"^([A-Za-z][A-Za-z.'\s]*?)\s+([\d.\-]+)$", ref)
-    if match:
-        title, nums = match.groups()
-        ref = f"{title}.{nums}"
-    return ref.replace(" ", "_")
-
-
-def fetch_reference_text(raw_ref, now_str=None):
-    """Look up a user-typed reference (e.g. "Shabbat 2:3") on Sefaria and
-    return its flattened English text, or None if it can't be found/parsed.
-    Most Mishnah tractates resolve directly (Sefaria treats a bare
-    "Shabbat.2.3" as the Mishnah when there's no daf/amud notation), but a
-    few canonical titles require the "Mishnah_" prefix - try both.
+def _fetch_sefaria_ref_text(raw_ref, now_str):
+    """Look up a user-typed reference on Sefaria and return its flattened
+    English text, or None if it can't be resolved. Sefaria's own /texts
+    endpoint already parses casual input (colons, bare spaces, even Hebrew
+    gematria like "ג ד" for 3:4) far better than any regex we'd write, so
+    this just passes the trimmed string straight through - plus a
+    "Mishnah_" prefix retry for the handful of titles that need it, and
+    context=0 so a single-mishnah ref returns just that mishnah rather than
+    its whole surrounding chapter.
     """
-    ref = _normalize_sefaria_ref(raw_ref)
+    ref = raw_ref.strip()
     if not ref:
         return None
-    now_str = now_str or datetime.datetime.now().isoformat()
     for candidate in (ref, f"Mishnah_{ref}"):
-        data = sc.fetch_text(candidate, now_str)
+        data = sc.fetch_text(candidate, now_str, context=False)
         if data and data.get("text"):
             paragraphs = sc.flatten_to_paragraphs(data["text"])
             if paragraphs:
                 return "\n".join(paragraphs)
     return None
+
+
+TOPIC_RESEARCH_SYSTEM_PROMPT = """You are researching a topic for a short explainer video. Given a \
+topic or question (which may or may not be a classical-text citation), write 3-5 informative, \
+factual paragraphs in English covering it - enough concrete detail (history, how things worked, key \
+facts/figures/opinions) for someone to then turn into a short narrated video. No need for jokes or a \
+specific tone here - this is source material, not the final script. If the topic concerns a Jewish \
+text/concept, include relevant terms in Hebrew alongside their English explanation. Respond with only \
+the paragraphs, no preamble."""
+
+
+@_with_retries()
+def _research_topic(query):
+    """Fallback for when a typed reference isn't a resolvable Sefaria citation
+    at all, but a general topic/question (e.g. "the history of sourdough
+    starter") - has the model write informational source material from its
+    own knowledge, since there's no live lookup for that out of this call.
+    """
+    resp = requests.post(
+        f"{BASE}/chat/completions",
+        headers=_headers(),
+        json={
+            "model": SCENE_MODEL,
+            "messages": [
+                {"role": "system", "content": TOPIC_RESEARCH_SYSTEM_PROMPT},
+                {"role": "user", "content": query},
+            ],
+            "temperature": 0.5,
+        },
+        timeout=60,
+    )
+    resp.raise_for_status()
+    return resp.json()["choices"][0]["message"]["content"].strip()
+
+
+def fetch_reference_text(raw_query, now_str=None):
+    """Resolve a user-typed reference-or-topic into source text: try it as a
+    Sefaria citation first (handles classical refs in English or Hebrew,
+    including gematira like "ג ד"); if that fails, treat it as a general
+    topic and have the model research/write source material instead. Returns
+    (text, source) where source is "sefaria" or "model", or (None, None) if
+    even the query itself was empty.
+    """
+    if not raw_query or not raw_query.strip():
+        return None, None
+    now_str = now_str or datetime.datetime.now().isoformat()
+    sefaria_text = _fetch_sefaria_ref_text(raw_query, now_str)
+    if sefaria_text:
+        return sefaria_text, "sefaria"
+    return _research_topic(raw_query), "model"
 
 
 def _strip_json_fences(content):

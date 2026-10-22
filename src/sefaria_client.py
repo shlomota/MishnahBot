@@ -49,30 +49,36 @@ def _cache_set(key, payload, now_str):
         )
 
 
-def _get_json(path, now_str):
-    key = f"GET {path}"
+def _get_json(path, now_str, params=None):
+    key = f"GET {path}?{params}" if params else f"GET {path}"
     cached = _cache_get(key)
     if cached is not None:
         return cached
-    resp = requests.get(f"{API_BASE}{path}", timeout=REQUEST_TIMEOUT)
+    resp = requests.get(f"{API_BASE}{path}", params=params, timeout=REQUEST_TIMEOUT)
     resp.raise_for_status()
     data = resp.json()
     _cache_set(key, data, now_str)
     return data
 
 
-def fetch_text(ref, now_str):
+def fetch_text(ref, now_str, context=True):
     """Return {'he': [...], 'text': [...], 'heTitle': str} for a ref, cached forever.
 
-    'he'/'text' are returned exactly as Sefaria nests them (a flat per-mishnah
-    list for a single chapter, a list-of-chapters-of-mishnayot for a chapter
-    range) - callers that need to know which mishnah is which should use that
-    structure directly rather than a pre-flattened one.
+    With context=True (default - used for whole-chapter day readings), 'he'/'text'
+    are returned exactly as Sefaria nests them (a flat per-mishnah list for a single
+    chapter, a list-of-chapters-of-mishnayot for a chapter range) - callers that need
+    to know which mishnah is which should use that structure directly rather than a
+    pre-flattened one.
+
+    With context=False (used for a single specific-mishnah lookup, e.g.
+    fetch_reference_text), Sefaria returns only that segment - 'he'/'text' are plain
+    strings, not lists - and the surrounding chapter is not included.
 
     Returns None if the ref can't be fetched (network error, doesn't exist, etc).
     """
+    params = None if context else {"context": 0}
     try:
-        data = _get_json(f"/texts/{ref}", now_str)
+        data = _get_json(f"/texts/{ref}", now_str, params)
     except (requests.RequestException, ValueError):
         return None
     if data.get("error"):

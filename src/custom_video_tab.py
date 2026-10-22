@@ -25,8 +25,8 @@ def _initial_length():
 def render_custom_video_tab():
     st.title("🎬 Explainer video from your text")
     st.caption(
-        "Paste any text and get a narrated, hand-drawn-style whiteboard explainer video "
-        "in the same style as the Daily Mishnah videos."
+        "Paste any text, look up a classical reference, or type a topic, and get a narrated, "
+        "hand-drawn-style whiteboard explainer video in the same style as the Daily Mishnah videos."
     )
 
     if not st.session_state.get("video_gen_unlocked"):
@@ -47,16 +47,19 @@ def render_custom_video_tab():
 
     ref_col, btn_col = st.columns([4, 1])
     ref = ref_col.text_input(
-        "Or: a Sefaria reference", value=_query_param("ref"),
-        placeholder='e.g. "Shabbat 2:3" or "Pirkei Avot 1"',
+        "Or: a reference or topic", value=_query_param("ref"),
+        placeholder='e.g. "Shabbat 2:3", "ג ד בבא קמא", or "history of sourdough starter"',
     )
     btn_col.markdown("<div style='height: 1.9rem'></div>", unsafe_allow_html=True)
     if btn_col.button("Look up", disabled=not ref.strip()):
-        looked_up = vs.fetch_reference_text(ref)
+        with st.spinner("Looking up..."):
+            looked_up, source = vs.fetch_reference_text(ref)
         if looked_up:
             st.session_state[text_key] = looked_up
+            if source == "model":
+                st.info("Not a Sefaria citation - this is the model's own research on the topic, not a sourced text.")
         else:
-            st.error(f'Couldn\'t find a text for "{ref}" - check the reference and try again.')
+            st.error(f'Couldn\'t find or research "{ref}" - try rephrasing.')
 
     text = st.text_area("Text", height=200, key=text_key,
                         placeholder="Paste a passage, a verse, a mishnah, a story... or look up a reference above")
