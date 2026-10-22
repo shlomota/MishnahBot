@@ -604,7 +604,22 @@ def _render(final_path, timed_segments, total_duration, narration_filename, code
         shutil.rmtree(work_dir, ignore_errors=True)
 
 
-def _run_pipeline(segments, code, citation, prefix, final_path):
+def _write_video_metadata(final_path, segments, citation, kind):
+    """Sidecar JSON next to the mp4 (e.g. 5787_40.mp4 -> 5787_40.json) so the
+    "explore videos" catalog can show an indicative title without having to
+    re-derive one from the filename - see list_generated_videos."""
+    blurb = segments[0]["text"] if segments else ""
+    meta = {
+        "citation": citation or "",
+        "blurb": blurb[:160],
+        "kind": kind,
+        "created_at": datetime.datetime.now().isoformat(),
+    }
+    with open(final_path + ".json", "w") as f:
+        json.dump(meta, f)
+
+
+def _run_pipeline(segments, code, citation, prefix, final_path, kind):
     """Shared second half of the pipeline (critic pass, narration, render) -
     used by both generate_video_for_day and generate_video_for_text once
     each has produced an initial draft (segments, code, citation)."""
@@ -615,7 +630,40 @@ def _run_pipeline(segments, code, citation, prefix, final_path):
     narration_filename = _combine_narration_audio(prefix, timed_segments, total_duration)
 
     _render(final_path, timed_segments, total_duration, narration_filename, code, citation)
+    _write_video_metadata(final_path, segments, citation, kind)
     return final_path
+
+
+def list_generated_videos():
+    """List every cached video (Daily Mishnah and custom-text alike) newest
+    first, with an indicative title/blurb for the "explore videos" page.
+    Videos generated before metadata sidecars existed still show up, just
+    with a plainer filename-derived title."""
+    videos = []
+    for path in glob.glob(os.path.join(OUT_DIR, "*.mp4")):
+        filename = os.path.basename(path)
+        meta_path = path + ".json"
+        meta = {}
+        if os.path.exists(meta_path):
+            try:
+                with open(meta_path) as f:
+                    meta = json.load(f)
+            except (json.JSONDecodeError, OSError):
+                meta = {}
+        kind = meta.get("kind") or ("custom" if filename.startswith("custom_") else "daily")
+        title = meta.get("citation") or meta.get("blurb") or filename.rsplit(".", 1)[0]
+        mtime = os.path.getmtime(path)
+        created_at = meta.get("created_at") or datetime.datetime.fromtimestamp(mtime).isoformat()
+        videos.append({
+            "path": path,
+            "title": title,
+            "blurb": meta.get("blurb", ""),
+            "kind": kind,
+            "created_at": created_at,
+            "mtime": mtime,
+        })
+    videos.sort(key=lambda v: v["mtime"], reverse=True)
+    return videos
 
 
 def generate_video_for_day(day, cycle_id):
@@ -635,7 +683,7 @@ def generate_video_for_day(day, cycle_id):
     segments, code, citation = generate_scene_for_day(day, readings_text)
     prefix = f"{cycle_id}_{day.day_num}"
     final_path = video_path_for(cycle_id, day.day_num)
-    return _run_pipeline(segments, code, citation, prefix, final_path)
+    return _run_pipeline(segments, code, citation, prefix, final_path, kind="daily")
 
 
 def custom_video_key(text, length_seconds, style, tone):
@@ -657,4 +705,4 @@ def generate_video_for_text(text, length_seconds=DEFAULT_TARGET_SECONDS, style=N
     segments, code, citation = generate_scene_for_text(text, length_seconds, style, tone)
     prefix = f"custom_{custom_video_key(text, length_seconds, style, tone)}"
     final_path = custom_video_path(custom_video_key(text, length_seconds, style, tone))
-    return _run_pipeline(segments, code, citation, prefix, final_path)
+    return _run_pipeline(segments, code, citation, prefix, final_path, kind="custom")

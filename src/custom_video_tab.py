@@ -22,6 +22,51 @@ def _initial_length():
     return min(LENGTH_OPTIONS, key=lambda s: abs(s - requested))
 
 
+def _render_explore_section():
+    st.subheader("📚 Explore videos")
+    st.caption("Every explainer video generated so far, from this page or the Daily Mishnah tab - free to browse.")
+
+    videos = vs.list_generated_videos()
+    if not videos:
+        st.caption("No videos generated yet.")
+        return
+
+    query = st.text_input("Search", key="explore_search", placeholder="Filter by title or topic...")
+    if query.strip():
+        q = query.strip().lower()
+        shown = [v for v in videos if q in v["title"].lower() or q in v["blurb"].lower()]
+    else:
+        shown = videos
+
+    if not shown:
+        st.caption(f'No videos match "{query}".')
+        return
+
+    idx_key = "explore_index"
+    # A search that changes the result set can easily leave the old index
+    # out of range (or pointing at a different video) - reset it then.
+    if st.session_state.get("explore_last_query") != query:
+        st.session_state[idx_key] = 0
+        st.session_state["explore_last_query"] = query
+    idx = st.session_state.get(idx_key, 0)
+    idx = max(0, min(idx, len(shown) - 1))
+
+    prev_col, label_col, next_col = st.columns([1, 4, 1])
+    if prev_col.button("◀ Prev", disabled=idx <= 0):
+        idx -= 1
+    if next_col.button("Next ▶", disabled=idx >= len(shown) - 1):
+        idx += 1
+    st.session_state[idx_key] = idx
+    label_col.markdown(f"<div style='text-align:center'>{idx + 1} / {len(shown)}</div>", unsafe_allow_html=True)
+
+    current = shown[idx]
+    kind_badge = "Daily Mishnah" if current["kind"] == "daily" else "Custom"
+    st.markdown(f"**{current['title']}** · _{kind_badge}_ · {current['created_at'][:10]}")
+    if current["blurb"] and current["blurb"] != current["title"]:
+        st.caption(current["blurb"])
+    st.video(current["path"])
+
+
 def render_custom_video_tab():
     st.title("🎬 Explainer video from your text")
     st.caption(
@@ -29,9 +74,13 @@ def render_custom_video_tab():
         "hand-drawn-style whiteboard explainer video in the same style as the Daily Mishnah videos."
     )
 
+    _render_explore_section()
+    st.divider()
+
     if not st.session_state.get("video_gen_unlocked"):
         # Same PIN and unlock flag as the Daily Mishnah tab - this page has no
-        # login, and each generation spends real OpenRouter credits.
+        # login, and each generation spends real OpenRouter credits. Browsing
+        # above needs no PIN since it costs nothing.
         pin = st.text_input("PIN to generate a video", type="password", key="pin_custom")
         if pin:
             if vs.VIDEO_GEN_PIN and pin == vs.VIDEO_GEN_PIN:
