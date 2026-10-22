@@ -214,6 +214,40 @@ def collect_readings_text(day, now_str):
     return "\n\n".join(blocks)
 
 
+def _normalize_sefaria_ref(raw):
+    """Turn a casually-typed reference ("Shabbat 2:3", "Pirkei Avot 1") into a
+    Sefaria ref string ("Shabbat.2.3"). Refs that already look fully-formed
+    (contain a '.') pass through almost as-is."""
+    ref = raw.strip().replace(":", ".")
+    if not ref:
+        return None
+    match = re.match(r"^([A-Za-z][A-Za-z.'\s]*?)\s+([\d.\-]+)$", ref)
+    if match:
+        title, nums = match.groups()
+        ref = f"{title}.{nums}"
+    return ref.replace(" ", "_")
+
+
+def fetch_reference_text(raw_ref, now_str=None):
+    """Look up a user-typed reference (e.g. "Shabbat 2:3") on Sefaria and
+    return its flattened English text, or None if it can't be found/parsed.
+    Most Mishnah tractates resolve directly (Sefaria treats a bare
+    "Shabbat.2.3" as the Mishnah when there's no daf/amud notation), but a
+    few canonical titles require the "Mishnah_" prefix - try both.
+    """
+    ref = _normalize_sefaria_ref(raw_ref)
+    if not ref:
+        return None
+    now_str = now_str or datetime.datetime.now().isoformat()
+    for candidate in (ref, f"Mishnah_{ref}"):
+        data = sc.fetch_text(candidate, now_str)
+        if data and data.get("text"):
+            paragraphs = sc.flatten_to_paragraphs(data["text"])
+            if paragraphs:
+                return "\n".join(paragraphs)
+    return None
+
+
 def _strip_json_fences(content):
     return re.sub(r"^```(?:json)?\s*|\s*```$", "", content.strip())
 

@@ -41,8 +41,25 @@ def render_custom_video_tab():
                 st.error("Incorrect PIN.")
         return
 
-    text = st.text_area("Text", value=_query_param("text"), height=200,
-                        placeholder="Paste a passage, a verse, a mishnah, a story...")
+    text_key = "custom_video_text"
+    if text_key not in st.session_state:
+        st.session_state[text_key] = _query_param("text")
+
+    ref_col, btn_col = st.columns([4, 1])
+    ref = ref_col.text_input(
+        "Or: a Sefaria reference", value=_query_param("ref"),
+        placeholder='e.g. "Shabbat 2:3" or "Pirkei Avot 1"',
+    )
+    btn_col.markdown("<div style='height: 1.9rem'></div>", unsafe_allow_html=True)
+    if btn_col.button("Look up", disabled=not ref.strip()):
+        looked_up = vs.fetch_reference_text(ref)
+        if looked_up:
+            st.session_state[text_key] = looked_up
+        else:
+            st.error(f'Couldn\'t find a text for "{ref}" - check the reference and try again.')
+
+    text = st.text_area("Text", height=200, key=text_key,
+                        placeholder="Paste a passage, a verse, a mishnah, a story... or look up a reference above")
     length = st.select_slider("Length (seconds)", options=LENGTH_OPTIONS, value=_initial_length())
     style = st.text_input(
         "Visual style (optional)", value=_query_param("style"),
